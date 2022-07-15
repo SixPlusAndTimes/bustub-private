@@ -42,7 +42,7 @@ TEST(StarterTest, SampleTest) {
 }
 
 /** Test that matrix initialization works as expected */
-TEST(StarterTest, DISABLED_InitializationTest) {
+TEST(StarterTest, InitializationTest) {
   auto matrix = std::make_unique<RowMatrix<int>>(2, 2);
 
   // Source contains too few elements
@@ -68,7 +68,7 @@ TEST(StarterTest, DISABLED_InitializationTest) {
   }
 }
 
-TEST(StarterTest, DISABLED_ElementAccessTest) {
+TEST(StarterTest, ElementAccessTest) {
   auto matrix = std::make_unique<RowMatrix<int>>(2, 2);
 
   std::vector<int> source(4);
