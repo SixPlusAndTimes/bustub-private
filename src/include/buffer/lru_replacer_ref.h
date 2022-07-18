@@ -15,11 +15,12 @@
 #include <list>
 #include <mutex>  // NOLINT
 #include <unordered_map>
-#include <utility>
+// #include <utility>
 #include <vector>
 
 #include "buffer/replacer.h"
 #include "common/config.h"
+
 namespace bustub {
 
 /**
@@ -47,12 +48,13 @@ class LRUReplacer : public Replacer {
   size_t Size() override;
 
  private:
-  // https://leetcode.cn/problems/lru-cache/solution/lruhuan-cun-ji-zhi-by-leetcode-solution/
-  // front端是新的， back端是旧的
-  std::list<frame_id_t> list_;
+  // TODO(student): implement me!
+  // using IteratorPair = std::pair<bool, std::list<frame_id_t>::iterator>;
+  // std::unordered_map<frame_id_t, IteratorPair> map_;
+  std::mutex lock_;
+  std::list<frame_id_t> data_;
   std::unordered_map<frame_id_t, std::list<frame_id_t>::iterator> map_;
-  size_t capacity_;
-  std::mutex latch_;
+  // size_t capacity_;
 };
 
 }  // namespace bustub
