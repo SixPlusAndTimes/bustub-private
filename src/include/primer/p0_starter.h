@@ -1,24 +1,10 @@
-//===----------------------------------------------------------------------===//
-//
-//                         BusTub
-//
-// p0_starter.h
-//
-// Identification: src/include/primer/p0_starter.h
-//
-// Copyright (c) 2015-2020, Carnegie Mellon University Database Group
-//
-//===----------------------------------------------------------------------===//
-
 #pragma once
 
-#include <algorithm>
 #include <memory>
 #include <stdexcept>
 #include <vector>
 
 #include "common/exception.h"
-#include "common/logger.h"
 namespace bustub {
 
 /**
@@ -146,8 +132,6 @@ class RowMatrix : public Matrix<T> {
    */
   T GetElement(int i, int j) const override {
     if (i < 0 || j < 0 || i > Matrix<T>::rows_ - 1 || j > Matrix<T>::cols_ - 1) {
-      LOG_DEBUG("The matrix rows = %d, matrix cols = %d, but getElement(%d, %d)\n", GetRowCount(), GetColumnCount(), i,
-                j);
       throw Exception(ExceptionType::OUT_OF_RANGE, "getElement() outof range");
     }
     return data_[i][j];
@@ -182,12 +166,12 @@ class RowMatrix : public Matrix<T> {
    * @throws OUT_OF_RANGE if `source` is incorrect size
    */
   void FillFrom(const std::vector<T> &source) override {
-    int vectorSize = source.size();
+    int vector_size = source.size();
     // LOG_DEBUG("vector size :%d, and rows = %d, cols = %d",vectorSize,Matrix<T>::rows_, Matrix<T>::rows_);
-    if (vectorSize != Matrix<T>::rows_ * Matrix<T>::cols_) {
+    if (vector_size != Matrix<T>::rows_ * Matrix<T>::cols_) {
       throw Exception(ExceptionType::OUT_OF_RANGE, "source is incorrect size");
     }
-    for (int k = 0; k < vectorSize; k++) {
+    for (int k = 0; k < vector_size; k++) {
       Matrix<T>::linear_[k] = source[k];
     }
   }
@@ -229,9 +213,11 @@ class RowMatrixOperations {
     if (matrixA->GetColumnCount() != matrixB->GetColumnCount() || matrixA->GetRowCount() != matrixB->GetRowCount()) {
       return std::unique_ptr<RowMatrix<T>>(nullptr);
     }
-    auto matrix_res = std::make_unique<RowMatrix<T>>(matrixA->GetRowCount(), matrixA->GetColumnCount());
-    for (int row = 0; row < matrixA->GetRowCount(); row++) {
-      for (int col = 0; col < matrixA->GetColumnCount(); col++) {
+    int rows = matrixA->GetRowCount();
+    int cols = matrixA->GetColumnCount();
+    auto matrix_res = std::unique_ptr<RowMatrix<T>>(new RowMatrix<T>(rows, cols));
+    for (int row = 0; row < rows; row++) {
+      for (int col = 0; col < cols; col++) {
         T elem_a = matrixA->GetElement(row, col);
         T elem_b = matrixB->GetElement(row, col);
         matrix_res->SetElement(row, col, elem_a + elem_b);
@@ -248,15 +234,14 @@ class RowMatrixOperations {
    * @return The result of matrix multiplication
    */
   static std::unique_ptr<RowMatrix<T>> Multiply(const RowMatrix<T> *matrixA, const RowMatrix<T> *matrixB) {
-    int row_count_a = matrixA->GetRowCount();
-    int row_count_b = matrixB->GetRowCount();
-    int col_count_a = matrixA->GetColumnCount();
-    int col_count_b = matrixB->GetColumnCount();
-    if (col_count_a != row_count_b) {
+    if (matrixA->GetColumnCount() != matrixB->GetRowCount()) {
       return std::unique_ptr<RowMatrix<T>>(nullptr);
     }
+    int row_count_a = matrixA->GetRowCount();
+    int col_count_a = matrixA->GetColumnCount();
+    int col_count_b = matrixB->GetColumnCount();
 
-    auto res = std::make_unique<RowMatrix<T>>(row_count_a, col_count_b);
+    auto res = std::unique_ptr<RowMatrix<T>>(new RowMatrix<T>(row_count_a, col_count_b));
 
     for (int i = 0; i < row_count_a; i++) {
       for (int j = 0; j < col_count_b; j++) {
@@ -283,6 +268,10 @@ class RowMatrixOperations {
   static std::unique_ptr<RowMatrix<T>> GEMM(const RowMatrix<T> *matrixA, const RowMatrix<T> *matrixB,
                                             const RowMatrix<T> *matrixC) {
     // TODO(P0): Add implementation
+    auto matrix_tmp = Multiply(matrixA, matrixB);  // Multiply(matrixA, matrixB)是右直
+    if (matrix_tmp != nullptr) {
+      return Add((matrix_tmp.get()), matrixC);
+    }
     return std::unique_ptr<RowMatrix<T>>(nullptr);
   }
 };
