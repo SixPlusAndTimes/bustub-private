@@ -52,7 +52,7 @@ void LRUReplacer::Pin(frame_id_t frame_id) {
 // This method should be called when the pin_count of a page becomes 0. This method should add the frame containing the
 // unpinned page to the LRUReplacer. 当一个页没有被pin住时才会被加入lru_repalcer中，表示可以将它从内存中驱逐 unpin :
 // 如果这个页已经存在了，不需要将该页移动到前端！！什么都别作
-// 本来还以为要加timestamp杀的呢
+// 本来还以为要加timestamp啥的呢
 void LRUReplacer::Unpin(frame_id_t frame_id) {
 //   std::lock_guard<std::mutex> lock(latch_);
   latch_.lock();
