@@ -123,10 +123,11 @@ class BufferPoolManagerInstance : public BufferPoolManager {
   void ValidatePageId(page_id_t page_id) const;
 
   //在 freeList或者lru中找到一个空闲的frame_page_id
-  bool FindFramePageId(frame_id_t* frame_page_id);
+  bool FindFramePageId(frame_id_t *frame_page_id);
   /** Number of pages in the buffer pool. */
   const size_t pool_size_;
-  /** How many instances are in the parallel BPM（Buffer Pool Manafer） (if present, otherwise just 1 BPI) 应该是有几个BP的意思吧？*/
+  /** How many instances are in the parallel BPM（Buffer Pool Manafer） (if present, otherwise just 1 BPI)
+   * 应该是有几个BP的意思吧？*/
   const uint32_t num_instances_ = 1;
   /** Index of this BPI in the parallel BPM (if present, otherwise just 0) */
   const uint32_t instance_index_ = 0;

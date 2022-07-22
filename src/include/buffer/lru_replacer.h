@@ -51,7 +51,7 @@ class LRUReplacer : public Replacer {
   // front端是新的， back端是旧的
   std::list<frame_id_t> list_;
   std::unordered_map<frame_id_t, std::list<frame_id_t>::iterator> map_;
-  size_t capacity_;
+  size_t capacity_; // 这个属性没有用到
   std::mutex latch_;
 };
 
