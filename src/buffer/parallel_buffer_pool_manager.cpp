@@ -16,6 +16,7 @@
 #include <new>
 #include <vector>
 #include "buffer/buffer_pool_manager_instance.h"
+// #include "common/logger.h"
 
 namespace bustub {
 
@@ -31,6 +32,7 @@ ParallelBufferPoolManager::ParallelBufferPoolManager(size_t num_instances, size_
         new BufferPoolManagerInstance(pool_size, num_instances, i, disk_manager, log_manager);
     buffer_pool_managers_.push_back(bmp);
   }
+  // LOG_DEBUG("num_instandes = %zu, pool_size = %zu \n",num_instances, pool_size);
 }
 
 // Update constructor to destruct all BufferPoolManagerInstances and deallocate any associated memory
@@ -85,6 +87,9 @@ Page *ParallelBufferPoolManager::NewPgImp(page_id_t *page_id) {
     index = (index + 1) % num_instances_;
   } while (index != start_index_);
   start_index_ = (start_index_ + 1) % num_instances_;
+  // LOG_DEBUG("ParallelBufferPoolManager::NewPgImp  getPage? : %d (1 : get, 0 : not get) ",new_page != nullptr);
+  // LOG_DEBUG("ParallelBufferPoolManager::NewPgImp, get pageId = %d", *page_id);
+
   return new_page;
 }
 

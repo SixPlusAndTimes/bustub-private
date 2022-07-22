@@ -45,7 +45,6 @@ void LRUReplacer::Unpin(frame_id_t frame_id) {
   // 我认为容量是没有用的，因为replacer的大小和pages大小一样，不可能超过
   if (map_.count(frame_id) == 0) {  // 之前不存在，对同一个元素调用两次unpin函数，第二次无效
     data_.emplace_back(frame_id);
-    // 为什么-- ？ ： list.end()返回 最后一位元素的后一个位置，所以要--调整
     map_.insert({frame_id, --data_.end()});
   }
 }
