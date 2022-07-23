@@ -14,9 +14,9 @@
 #include <cstdio>
 #include <random>
 #include <string>
+#include "/home/ljc/bustub-private/src/include/common/logger.h"
 #include "buffer/buffer_pool_manager.h"
 #include "gtest/gtest.h"
-#include "/home/ljc/bustub-private/src/include/common/logger.h"
 namespace bustub {
 
 // NOLINTNEXTLINE
@@ -56,13 +56,13 @@ TEST(ParallelBufferPoolManagerTest, BinaryDataTest) {
 
   // Scenario: We should be able to create new pages until we fill up the buffer pool.
   for (size_t i = 1; i < buffer_pool_size * num_instances; ++i) {
-    LOG_DEBUG("create %zuth size\n",i);
+    LOG_DEBUG("create %zuth size\n", i);
     EXPECT_NE(nullptr, bpm->NewPage(&page_id_temp));
   }
 
   // Scenario: Once the buffer pool is full, we should not be able to create any new pages.
   for (size_t i = buffer_pool_size; i < buffer_pool_size * num_instances * 2; ++i) {
-    LOG_DEBUG("create %zuth size\n",i);
+    LOG_DEBUG("create %zuth size\n", i);
     EXPECT_EQ(nullptr, bpm->NewPage(&page_id_temp));
   }
 

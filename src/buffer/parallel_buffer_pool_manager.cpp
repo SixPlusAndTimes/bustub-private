@@ -22,9 +22,7 @@ namespace bustub {
 
 ParallelBufferPoolManager::ParallelBufferPoolManager(size_t num_instances, size_t pool_size, DiskManager *disk_manager,
                                                      LogManager *log_manager)
-    : num_instances_(num_instances),
-      pool_size_(pool_size),
-      start_index_(0) {
+    : num_instances_(num_instances), pool_size_(pool_size), start_index_(0) {
   // Allocate and create individual BufferPoolManagerInstances
   for (size_t i = 0; i < num_instances; i++) {
     // BufferPoolManagerInstance buffer_pool(pool_size,num_instances,i, disk_manager,log_manager);

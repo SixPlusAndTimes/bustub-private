@@ -14,7 +14,7 @@
 
 namespace bustub {
 // 容量这个属性好像没有用到阿
-LRUReplacer::LRUReplacer(size_t num_pages):capacity_(num_pages) {}
+LRUReplacer::LRUReplacer(size_t num_pages) {}
 
 LRUReplacer::~LRUReplacer() = default;
 // Remove the object that was accessed least recently compared to all the other elements being tracked by the Replacer,
@@ -27,8 +27,9 @@ bool LRUReplacer::Victim(frame_id_t *frame_id) {
     return false;
   }
   *frame_id = list_.back();
-  map_.erase(*frame_id);
   list_.pop_back();
+  map_.erase(*frame_id);
+
   // latch_.unlock();
   return true;
 }
@@ -38,14 +39,12 @@ bool LRUReplacer::Victim(frame_id_t *frame_id) {
 void LRUReplacer::Pin(frame_id_t frame_id) {
   std::lock_guard<std::mutex> lock(latch_);
   // latch_.lock();
-  if (map_.count(frame_id) == 0) {
+  if (map_.count(frame_id) > 0) {
+    // std::list<frame_id_t>::iterator to_remove = map_[frame_id];
+    list_.erase(map_[frame_id]);  //下面两个顺序不能反
+    map_.erase(frame_id);
     // latch_.unlock();
-    return;
   }
-  // std::list<frame_id_t>::iterator to_remove = map_[frame_id];
-  map_.erase(frame_id);
-  list_.erase(map_[frame_id]);
-  // latch_.unlock();
 }
 
 // This method should be called when the pin_count of a page becomes 0. This method should add the frame containing the
@@ -55,16 +54,14 @@ void LRUReplacer::Pin(frame_id_t frame_id) {
 void LRUReplacer::Unpin(frame_id_t frame_id) {
   std::lock_guard<std::mutex> lock(latch_);
   // latch_.lock();
-  if (map_.count(frame_id) != 0) {
-    // lru_replacer中已经有了这个page
+  if (map_.count(frame_id) == 0) {
+    list_.push_front(frame_id);
+    //  该写法错误 map_.insert(frame_id, list_.front()); 参考cppreference ，insert
+    //  的参数应该是一个std::pair才可以。我靠，vscode竟然不报错！
+    // map_[frame_id] = list_.begin(); // 这个写法，test_memory会报错
+    map_.insert({frame_id, list_.begin()});
     // latch_.unlock();
-    return;
   }
-  list_.push_front(frame_id);
-  //  该写法错误 map_.insert(frame_id, list_.front()); 参考cppreference ，insert
-  //  的参数应该是一个std::pair才可以。我靠，vscode竟然不报错！
-  map_[frame_id] = list_.begin();
-  // latch_.unlock();
 }
 
 size_t LRUReplacer::Size() {

@@ -74,7 +74,7 @@ void BufferPoolManagerInstance::FlushAllPgsImp() {
   for (std::pair<page_id_t, frame_id_t> element : page_table_) {
     page_to_flush = &pages_[element.second];
     disk_manager_->WritePage(element.first, page_to_flush->GetData());
-    page_to_flush->is_dirty_ = false; // 对比别人代码看出来的
+    page_to_flush->is_dirty_ = false;  // 对比别人代码看出来的
   }
   // latch_.unlock();
 }
@@ -89,7 +89,8 @@ Page *BufferPoolManagerInstance::NewPgImp(page_id_t *page_id) {
   // latch_.lock();
   std::lock_guard<std::mutex> lock(latch_);
   // 1. 分配pageid
-  // page_id_t page_id_just_allocated = AllocatePage(); //别在这里分配 ！！！ 否则在 ParallelBufferPoolManager的newpage测试中会有很大的pageid
+  // page_id_t page_id_just_allocated = AllocatePage(); //别在这里分配 ！！！ 否则在
+  // ParallelBufferPoolManager的newpage测试中会有很大的pageid
   frame_id_t frame_id_to_place_new_page;
   Page *new_page = nullptr;
   // 2. 找一个空闲的frame
@@ -183,7 +184,7 @@ bool BufferPoolManagerInstance::DeletePgImp(page_id_t page_id) {
     return false;
   }
 
-  if(page_to_delete->IsDirty()) {
+  if (page_to_delete->IsDirty()) {
     disk_manager_->WritePage(page_to_delete->page_id_, page_to_delete->data_);
   }
 

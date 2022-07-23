@@ -40,5 +40,49 @@ Page *BufferPoolManagerInstance::NewPgImp(page_id_t *page_id) {
   latch_.unlock();
   return new_page;
 }
-~~~cpp
+~~~
 
+
+这个改了之后，再提交显示超时，但是测试网站没有任何提示。起初以为是buffer_pool_manager_instance.cpp  parallel_buffer_pool_manager.cpp 的错误。参考别人的代码后，提交了6、7次后，定位到问题出在lru类...
+
+然后就开始比对自己代码与其他人代码的不同，提交了十多次，代码几乎全部改成了参考代码，但依然显示超时。
+
+不报希望地 `make check-clang-tidy`, 修改提交后显示满分了。。。。
+
+具体的语法错误是： size_t capacity_;这个属性没有用到但是初始化了，将他注释然后提交就过了
+
+~~~cpp
+ private:
+  // https://leetcode.cn/problems/lru-cache/solution/lruhuan-cun-ji-zhi-by-leetcode-solution/
+  // front端是新的， back端是旧的
+  std::list<frame_id_t> list_;
+  std::unordered_map<frame_id_t, std::list<frame_id_t>::iterator> map_;
+  // size_t capacity_;  // 这个属性没有用到 // make check-clang-tidy 检测会报错
+  std::mutex latch_;
+~~~
+
+然后把lru类改成自己的原来版本，没有超时，但是内存检测错误没过
+
+![img](./project1_submmit1_test_memory_failed.png)
+
+又倒腾了三四次 ,将map_[frame_id] = list_.begin();  改称 map_.insert({frame_id, list_.begin()}); 后满分通过了。
+
+具体原因还不是很清楚，因为我对C++的stl库不是很熟悉
+
+~~~cpp
+void LRUReplacer::Unpin(frame_id_t frame_id) {
+  std::lock_guard<std::mutex> lock(latch_);
+  // latch_.lock();
+  if (map_.count(frame_id) == 0) {
+    list_.push_front(frame_id);
+    //  该写法错误 map_.insert(frame_id, list_.front()); 参考cppreference ，insert
+    //  的参数应该是一个std::pair才可以。我靠，vscode竟然不报错！
+    // map_[frame_id] = list_.begin(); // 这个写法，test_memory会报错
+    map_.insert({frame_id, list_.begin()});
+    // latch_.unlock();
+  }
+}
+~~~
+
+满分截图，
+![img](./project1_submmit_100point.png)
