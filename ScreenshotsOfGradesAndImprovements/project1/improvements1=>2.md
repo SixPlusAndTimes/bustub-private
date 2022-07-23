@@ -84,5 +84,7 @@ void LRUReplacer::Unpin(frame_id_t frame_id) {
 }
 ~~~
 
-满分截图，
+满分截图和排名
+
 ![img](./project1_submmit_100point.png)
+![img](./project1_leaderboard_rank.png)
