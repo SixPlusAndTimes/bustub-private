@@ -13,6 +13,7 @@
 #include "storage/page/hash_table_bucket_page.h"
 #include <cassert>
 #include <iostream>
+#include <ostream>
 #include <utility>
 #include "common/logger.h"
 #include "common/util/hash_util.h"
@@ -34,8 +35,7 @@ bool HASH_TABLE_BUCKET_TYPE::GetValue(KeyType key, KeyComparator cmp, std::vecto
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_BUCKET_TYPE::Insert(KeyType key, ValueType value, KeyComparator cmp) {
   int readable_size = sizeof(readable_);
-  assert(readable_size == (BUCKET_ARRAY_SIZE - 1) / 8 + 1);
-  std::cout << "Inserting key = " << key << " : value = " << value << std::endl;
+  // assert(readable_size == (BUCKET_ARRAY_SIZE - 1) / 8 + 1);
   for(int array_index = 0; array_index <= readable_size; array_index++) {
      char reading_bytes = readable_[array_index];
      for(int byte_idx = 0; byte_idx <= 7; byte_idx++) {
@@ -48,7 +48,7 @@ bool HASH_TABLE_BUCKET_TYPE::Insert(KeyType key, ValueType value, KeyComparator 
           continue;
         }
         //找到空位，插入即可
-        LOG_DEBUG("Found free space, array_index = %d, byte_index = %d",array_index, byte_idx);
+        // LOG_DEBUG("Found free space, array_index = %d, byte_index = %d",array_index, byte_idx);
         array_[array_index * 8 + byte_idx] = std::pair<KeyType, ValueType>(key,value);
         readable_[array_index] = readable_[array_index] | (0B10000000 >> byte_idx);
         //还要修改 occupied数组,将对应的位置1即可
@@ -68,7 +68,7 @@ bool HASH_TABLE_BUCKET_TYPE::Insert(KeyType key, ValueType value, KeyComparator 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_BUCKET_TYPE::Remove(KeyType key, ValueType value, KeyComparator cmp) {
   int readable_size = sizeof(readable_);
-  assert(readable_size == (BUCKET_ARRAY_SIZE - 1) / 8 + 1);
+  // assert(readable_size == (BUCKET_ARRAY_SIZE - 1) / 8 + 1);
   
   for(int array_index = 0; array_index <= readable_size; array_index++) {
     char reading_bytes = readable_[array_index];
@@ -82,10 +82,14 @@ bool HASH_TABLE_BUCKET_TYPE::Remove(KeyType key, ValueType value, KeyComparator 
 
       if(static_cast<bool>(reading_bytes & (0B10000000 >> byte_idx))){
         //这个位置还有元素，查看它的元素是否是要删除的元素
-        if( cmp(array_[array_index * 8 + byte_idx].first , key)){
+        if( cmp(array_[array_index * 8 + byte_idx].first , key) == 0){
+          // std::cout << "remove key = " << key << " remove value = " << value <<std::endl;
+          LOG_DEBUG("Rmove Element , array index = %d, bit index = %d", array_index, byte_idx);
+          // std::cout << "actual remove key = " << array_[array_index * 8 + byte_idx].first <<std::endl;
           //如果是则删除它，只需要将readable数组对应的位设置为0即可
           RemoveBit(&readable_[array_index],7 - byte_idx);
-          assert((readable_[array_index] & (0B10000000 >> byte_idx)) == 0);
+          // std::cout << "readable_[array_index] & (0B10000000 >> byte_idx) = " << (readable_[array_index] & (0B10000000 >> byte_idx)) <<std::endl;
+          // assert((readable_[array_index] & (0B10000000 >> byte_idx)) == 0);
           return true;
         }
       }
@@ -123,6 +127,8 @@ bool HASH_TABLE_BUCKET_TYPE::IsReadable(uint32_t bucket_idx) const {
   int byte_idx = static_cast<int>(bucket_idx / 8);
   int bit_idx =static_cast<int>(bucket_idx - byte_idx * 8);
   char byte = readable_[byte_idx];
+  // LOG_DEBUG("IsReadable(): byteindex = %d, bitindex = %d", byte_idx, bit_idx);
+  // std::cout << "byte & (0B10000000 >> bit_idx) = " << (byte & (0B10000000 >> bit_idx)) << std::endl;
   return (byte & (0B10000000 >> bit_idx)) != 0;
 }
 
