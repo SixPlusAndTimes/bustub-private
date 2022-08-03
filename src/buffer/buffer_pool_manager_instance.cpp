@@ -80,6 +80,7 @@ void BufferPoolManagerInstance::FlushAllPgsImp() {
 }
 
 // Creates a new page in the buffer pool. ,注意这是创建一个新的页,得立即写回磁盘!
+//  新建一个页面后，它的pincount 为1，而不是0
 Page *BufferPoolManagerInstance::NewPgImp(page_id_t *page_id) {
   // 0.   Make sure you call AllocatePage!
   // 1.   If all the pages in the buffer pool are pinned, return nullptr.

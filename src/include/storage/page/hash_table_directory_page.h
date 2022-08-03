@@ -190,7 +190,9 @@ class HashTableDirectoryPage {
   page_id_t page_id_;
   lsn_t lsn_;
   uint32_t global_depth_{0};
+  // DIRECTORY_ARRAY_SIZE = 512
   uint8_t local_depths_[DIRECTORY_ARRAY_SIZE];
+  //存放bucketpage的page_id
   page_id_t bucket_page_ids_[DIRECTORY_ARRAY_SIZE];
 };
 

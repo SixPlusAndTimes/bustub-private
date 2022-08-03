@@ -123,14 +123,14 @@ class ExtendibleHashTable {
 
   /**
    * Fetches the directory page from the buffer pool manager.
-   *
+   *  使用过后 一定要unpin！！
    * @return a pointer to the directory page
    */
   HashTableDirectoryPage *FetchDirectoryPage();
 
   /**
    * Fetches the a bucket page from the buffer pool manager using the bucket's page_id.
-   *
+   * 使用过后 一定要 unpin！！
    * @param bucket_page_id the page_id to fetch
    * @return a pointer to a bucket page
    */
