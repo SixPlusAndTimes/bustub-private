@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <cassert>
 #include <cstdint>
 #include <iostream>
 #include <ostream>
@@ -24,23 +25,26 @@
 #include "container/hash/extendible_hash_table.h"
 #include "storage/page/hash_table_bucket_page.h"
 #include "storage/page/hash_table_directory_page.h"
+#include "storage/page/hash_table_page_defs.h"
 
 namespace bustub {
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 HASH_TABLE_TYPE::ExtendibleHashTable(const std::string &name, BufferPoolManager *buffer_pool_manager,
                                      const KeyComparator &comparator, HashFunction<KeyType> hash_fn)
-    : buffer_pool_manager_(buffer_pool_manager), comparator_(comparator), hash_fn_(std::move(hash_fn)){
+    : buffer_pool_manager_(buffer_pool_manager), comparator_(comparator), hash_fn_(std::move(hash_fn)) {
   // 新建目录页 和 一个bucket页面，在目录页面的bucket_page_ids_数组中设置新的bucket页面的page_id
-  auto new_hash_table_directory_page = reinterpret_cast<HashTableDirectoryPage*>(buffer_pool_manager_->NewPage(&directory_page_id_)->GetData());
+  auto new_hash_table_directory_page =
+      reinterpret_cast<HashTableDirectoryPage *>(buffer_pool_manager_->NewPage(&directory_page_id_)->GetData());
   page_id_t bucket_page_id = INVALID_PAGE_ID;
-  // auto hash_table_bucket_page= reinterpret_cast<HashTableBucketPage<KeyType,ValueType,KeyComparator>*>(buffer_pool_manager_->NewPage(&bucket_page_id)->GetData());
+  // auto hash_table_bucket_page=
+  // reinterpret_cast<HashTableBucketPage<KeyType,ValueType,KeyComparator>*>(buffer_pool_manager_->NewPage(&bucket_page_id)->GetData());
   buffer_pool_manager_->NewPage(&bucket_page_id);
 
   new_hash_table_directory_page->SetBucketPageId(0, bucket_page_id);
   new_hash_table_directory_page->SetLocalDepth(0, 0);
-  //unpin这两个页面
-  buffer_pool_manager_->UnpinPage(directory_page_id_,true);
+  // unpin这两个页面
+  buffer_pool_manager_->UnpinPage(directory_page_id_, true);
   buffer_pool_manager_->UnpinPage(bucket_page_id, true);
 }
 
@@ -61,7 +65,7 @@ uint32_t HASH_TABLE_TYPE::Hash(KeyType key) {
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 uint32_t HASH_TABLE_TYPE::KeyToDirectoryIndex(KeyType key, HashTableDirectoryPage *dir_page) {
-  //记住： bmp->fetch方法是会pin页面的，用完页面后即得unpin它，否则bufferpool空间容易满找不到空闲空间
+  // 记住： bmp->fetch方法是会pin页面的，用完页面后即得unpin它，否则bufferpool空间容易满找不到空闲空间
   auto mask = dir_page->GetGlobalDepthMask();
   return Hash(key) & mask;
 }
@@ -74,7 +78,8 @@ page_id_t HASH_TABLE_TYPE::KeyToPageId(KeyType key, HashTableDirectoryPage *dir_
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 HashTableDirectoryPage *HASH_TABLE_TYPE::FetchDirectoryPage() {
-  auto dir_page = reinterpret_cast<HashTableDirectoryPage *>(buffer_pool_manager_->FetchPage(directory_page_id_)->GetData());
+  auto dir_page =
+      reinterpret_cast<HashTableDirectoryPage *>(buffer_pool_manager_->FetchPage(directory_page_id_)->GetData());
   return dir_page;
 }
 
@@ -90,11 +95,12 @@ HASH_TABLE_BUCKET_TYPE *HASH_TABLE_TYPE::FetchBucketPage(page_id_t bucket_page_i
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_TYPE::GetValue(Transaction *transaction, const KeyType &key, std::vector<ValueType> *result) {
   table_latch_.RLock();
+  // 待改进： 锁的粒度优化
   auto dir_page = FetchDirectoryPage();
   auto bucket_page_id = KeyToPageId(key, dir_page);
   auto bucket_page = FetchBucketPage(bucket_page_id);
-  bool got_value =  bucket_page->GetValue(key, comparator_,result);
-  //一定要unpin ！！！
+  bool got_value = bucket_page->GetValue(key, comparator_, result);
+  // 一定要unpin ！！！
   buffer_pool_manager_->UnpinPage(directory_page_id_, true);
   buffer_pool_manager_->UnpinPage(bucket_page_id, true);
   table_latch_.RUnlock();
@@ -108,25 +114,94 @@ bool HASH_TABLE_TYPE::GetValue(Transaction *transaction, const KeyType &key, std
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const ValueType &value) {
   // 待改进锁的粒度
-  table_latch_.WLock();
+  // table_latch_.WLock();
   auto dir_page = FetchDirectoryPage();
-  auto bucker_page_id = KeyToPageId(key, dir_page);
-  HASH_TABLE_BUCKET_TYPE* bucket_page = FetchBucketPage(bucker_page_id);
-  if( bucket_page->IsFull() ) {
-    SplitInsert(transaction, key, value); 
+  auto bucket_page_id = KeyToPageId(key, dir_page);
+  HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(bucket_page_id);
+  bool has_inserted = false;
+  if (bucket_page->IsFull()) {
+    has_inserted = SplitInsert(transaction, key, value);
   }
-  bool has_inserted = bucket_page->Insert(key, value, comparator_);
-  //不要忘记unpin页面
+  has_inserted = bucket_page->Insert(key, value, comparator_);
+  // 不要忘记unpin页面
   buffer_pool_manager_->UnpinPage(directory_page_id_, true);
-  buffer_pool_manager_->UnpinPage(bucker_page_id, true);
-  table_latch_.WUnlock();
+  buffer_pool_manager_->UnpinPage(bucket_page_id, true);
+  // table_latch_.WUnlock();
   return has_inserted;
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, const ValueType &value) {
-  std::cout << "split insert!" <<std::endl;
-  return false;
+  // TODO(ljc):  改进锁的粒度
+  // table_latch_.WLock();
+  HashTableDirectoryPage *dir_page = FetchDirectoryPage();
+  auto bucket_idx = KeyToDirectoryIndex(key, dir_page);
+  auto bucket_page_id = KeyToPageId(key, dir_page);
+  HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(bucket_page_id);
+
+  assert(bucket_page->IsFull());  // splitinsert 的时候这个页面一定是满的！
+
+  // 根据该buckut页面的local_depth 是否等于 global_depth有两种做法
+  //  如果local-depth == global_depth, 那么目录页面得增加一倍，然后分裂bucket，将原页面的键直对rehash
+  //  如果local-depth < global_depth, 那么仅分裂bucket即可
+  auto local_depth = dir_page->GetLocalDepth(bucket_idx);
+  auto global_depth = dir_page->GetGlobalDepth();
+  if (local_depth == global_depth) {
+    // Directory Expansion
+    ExpensionDirectory(dir_page);
+  }
+  auto split_image_idx = dir_page->GetSplitImageIndex(bucket_idx);
+  page_id_t split_bucket_page_id;
+  // 为分裂bucket创建新的页面
+  HASH_TABLE_BUCKET_TYPE *image_bucket_page =
+      reinterpret_cast<HashTableBucketPage<KeyType, ValueType, KeyComparator> *>(
+          buffer_pool_manager_->NewPage(&split_bucket_page_id)->GetData());
+  // buffer_pool_manager_->NewPage(&split_bucket_page_id);
+  // 在directory中设置bucket_image的 pageid
+  dir_page->SetBucketPageId(split_image_idx, split_bucket_page_id);
+  // 两个bucket的local_depth都加一
+  dir_page->IncrLocalDepth(bucket_idx);
+  dir_page->IncrLocalDepth(split_image_idx);
+
+  // rehash所有原bucket中的元素 , 这个过程一定不会overflow
+  for (uint32_t i = 0; i < static_cast<uint32_t>(BUCKET_ARRAY_SIZE); i++) {
+    auto key_rehash = bucket_page->KeyAt(i);
+    auto value_rehash = bucket_page->ValueAt(i);
+    auto rehash_bucket_page_id = KeyToPageId(key_rehash, dir_page);
+
+    if (rehash_bucket_page_id == bucket_page_id) {
+      // 该元素被hash到原来的bucket中，就不用做什么了
+      continue;
+    }
+    // 如果被hash到镜像bucket中，那么将它加入新的bucket，并且从老的bucket中删除
+    assert(rehash_bucket_page_id == split_bucket_page_id);  // 此时一定在镜像bucket中
+    image_bucket_page->Insert(key_rehash, value_rehash, comparator_);
+    // TODO(ljc): RemoveAt可能会更快
+    bucket_page->Remove(key_rehash, value_rehash, comparator_);
+  }
+
+  // 递归调用insert
+  bool has_inserted = Insert(transaction, key, value);
+  // 不要忘记unpin页面,这里有3个！
+  buffer_pool_manager_->UnpinPage(directory_page_id_, true);
+  buffer_pool_manager_->UnpinPage(bucket_page_id, true);
+  buffer_pool_manager_->UnpinPage(split_bucket_page_id, true);
+  // table_latch_.WUnlock();
+  return has_inserted;
+}
+
+template <typename KeyType, typename ValueType, typename KeyComparator>
+void HASH_TABLE_TYPE::ExpensionDirectory(HashTableDirectoryPage *dir_page) {
+  auto directory_size_original = dir_page->Size();
+  // globaldepth加一
+  dir_page->IncrGlobalDepth();
+  // auto global_depth_now = dir_page->GetGlobalDepth();
+  auto directory_size_now = dir_page->Size();
+  // 将原directory拷贝到现diretory的后半端中, 实际上拷贝的 bucket 的page_id，逻辑上是指针
+  for (uint32_t i = 0, j = directory_size_original; i <= directory_size_original - 1 && j <= directory_size_now - 1;
+       i++, j++) {
+    dir_page->SetBucketPageId(j, dir_page->GetBucketPageId(i));
+  }
 }
 
 /*****************************************************************************
@@ -134,14 +209,17 @@ bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
  *****************************************************************************/
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_TYPE::Remove(Transaction *transaction, const KeyType &key, const ValueType &value) {
-  table_latch_.WLock();
+  // table_latch_.WLock();
   auto dir_page = FetchDirectoryPage();
   auto bucker_page_id = KeyToPageId(key, dir_page);
-  HASH_TABLE_BUCKET_TYPE* bucket_page = FetchBucketPage(bucker_page_id);
-  bool has_deleted =  bucket_page->Remove(key, value, comparator_);
+  HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(bucker_page_id);
+  bool has_deleted = bucket_page->Remove(key, value, comparator_);
   // if(bucket_page->IsEmpty()) {}
-//  不要忘记unpin页面！！
-  table_latch_.WUnlock();
+  //  不要忘记unpin页面！！
+
+  buffer_pool_manager_->UnpinPage(directory_page_id_, true);
+  buffer_pool_manager_->UnpinPage(bucker_page_id, true);
+  // table_latch_.WUnlock();
   return has_deleted;
 }
 

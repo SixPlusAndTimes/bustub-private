@@ -16,9 +16,9 @@
 #include <vector>
 
 #include "common/config.h"
+#include "common/logger.h"
 #include "storage/index/int_comparator.h"
 #include "storage/page/hash_table_page_defs.h"
-#include "common/logger.h"
 
 namespace bustub {
 /**
@@ -140,14 +140,15 @@ class HashTableBucketPage {
   void PrintBucket();
 
   // 将char表示的数的index位数字位置为0
-  void RemoveBit(char* value, int index) {
+  void RemoveBit(char *value, int index) {
     char bit = static_cast<char>(1 << index);
     char mask = 0;
     // ^ 异或操作
     // ～ 桉位取反
     mask = static_cast<char>((~mask) ^ bit);
-    *value =static_cast<char>(*value & mask) ;
+    *value = static_cast<char>(*value & mask);
   }
+
  private:
   // For more on BUCKET_ARRAY_SIZE see storage/page/hash_table_page_defs.h
   // 表示数组该位是否被使用过，可用来提前结束循环。----- 好像并不能，所以没有用似乎。。。
@@ -156,8 +157,9 @@ class HashTableBucketPage {
   // 示数组该位当前是否存在元素。当需要删除某个元素时，将readable_置为0，occupied_不变。
   char readable_[(BUCKET_ARRAY_SIZE - 1) / 8 + 1];
   // Do not add any members below array_, as they will overlap.
-  // 零长数组简介 ： https://blog.csdn.net/gatieme/article/details/64131322， 好像不用这么深入，只用知道可以使用array_获取bucket元素就可以了
-  MappingType array_[0]; // 0长数组作为数组名，不占用存储空间，仅仅是个标记；但是可以用这个名字获取键值对
+  // 零长数组简介 ： https://blog.csdn.net/gatieme/article/details/64131322，
+  // 好像不用这么深入，只用知道可以使用array_获取bucket元素就可以了
+  MappingType array_[0];  // 0长数组作为数组名，不占用存储空间，仅仅是个标记；但是可以用这个名字获取键值对
 };
 
 }  // namespace bustub

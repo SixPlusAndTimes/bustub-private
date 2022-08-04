@@ -38,6 +38,7 @@ class ReaderWriterLatch {
    * Acquire a write latch.
    */
   void WLock() {
+    // uinique_lock permits recursive locking
     std::unique_lock<mutex_t> latch(mutex_);
     while (writer_entered_) {
       reader_.wait(latch);
