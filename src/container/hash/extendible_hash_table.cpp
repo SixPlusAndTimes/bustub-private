@@ -240,10 +240,11 @@ bool HASH_TABLE_TYPE::Remove(Transaction *transaction, const KeyType &key, const
   bool has_deleted = bucket_page->Remove(key, value, comparator_);
 
   // if(bucket_page->IsEmpty()) {}
-  //  不要忘记unpin页面！！
+
 
   reinterpret_cast<Page *>(bucket_page)->WUnlatch();
 
+  // 不要忘记unpin页面！！
   buffer_pool_manager_->UnpinPage(directory_page_id_, true);
   buffer_pool_manager_->UnpinPage(bucker_page_id, true);
   table_latch_.RUnlock();
