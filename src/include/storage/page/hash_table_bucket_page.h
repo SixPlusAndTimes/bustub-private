@@ -139,6 +139,13 @@ class HashTableBucketPage {
    */
   void PrintBucket();
 
+  // 自定义函数
+  uint32_t Size();
+
+  void SetUnreadable(uint32_t bucket_idx);
+
+  std::vector<MappingType> GetAllItem();
+
   // 将char表示的数的index位数字位置为0
   void RemoveBit(char *value, int index) {
     char bit = static_cast<char>(1 << index);

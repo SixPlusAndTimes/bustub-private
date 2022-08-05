@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "storage/page/hash_table_bucket_page.h"
 #include <sys/types.h>
 #include <cassert>
 #include <iostream>
@@ -20,6 +19,7 @@
 #include "common/util/hash_util.h"
 #include "storage/index/generic_key.h"
 #include "storage/index/hash_comparator.h"
+#include "storage/page/hash_table_bucket_page.h"
 #include "storage/page/hash_table_page_defs.h"
 #include "storage/table/tmp_tuple.h"
 
@@ -111,18 +111,12 @@ bool HASH_TABLE_BUCKET_TYPE::Remove(KeyType key, ValueType value, KeyComparator 
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 KeyType HASH_TABLE_BUCKET_TYPE::KeyAt(uint32_t bucket_idx) const {
-  if (IsReadable(bucket_idx)) {
-    return array_[bucket_idx].first;
-  }
-  return {};
+  return array_[bucket_idx].first;
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 ValueType HASH_TABLE_BUCKET_TYPE::ValueAt(uint32_t bucket_idx) const {
-  if (IsReadable(bucket_idx)) {
-    return array_[bucket_idx].second;
-  }
-  return {};
+  return array_[bucket_idx].second;
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
