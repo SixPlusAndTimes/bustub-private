@@ -158,7 +158,7 @@ class HashTableBucketPage {
 
  private:
   // For more on BUCKET_ARRAY_SIZE see storage/page/hash_table_page_defs.h
-  // 表示数组该位是否被使用过，可用来提前结束循环。----- 好像并不能，所以没有用似乎。。。
+  // 表示数组该位是否被使用过，可用来提前结束循环。
   char occupied_[(BUCKET_ARRAY_SIZE - 1) / 8 + 1];
   // 0 if tombstone/brand new (never occupied), 1 otherwise.
   // 示数组该位当前是否存在元素。当需要删除某个元素时，将readable_置为0，occupied_不变。

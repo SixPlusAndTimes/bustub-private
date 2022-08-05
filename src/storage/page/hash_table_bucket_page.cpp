@@ -34,6 +34,8 @@ bool HASH_TABLE_BUCKET_TYPE::GetValue(KeyType key, KeyComparator cmp, std::vecto
       if (cmp(key, KeyAt(index)) == 0) {
         result->push_back(ValueAt(index));
       }
+    } else if (!IsOccupied(index)) {  // occupied数组加速查找
+      break;
     }
   }
   return !static_cast<bool>(result->empty());
@@ -54,14 +56,14 @@ bool HASH_TABLE_BUCKET_TYPE::Insert(KeyType key, ValueType value, KeyComparator 
             array_[array_index * 8 + byte_idx].second == value) {
           return false;
         }
-        // //不重复则继续寻找下一个空位置
+        // 不重复则继续寻找下一个空位置
         continue;
       }
-      //找到空位，插入即可
+      // 找到空位，插入即可
       // LOG_DEBUG("Found free space, array_index = %d, byte_index = %d",array_index, byte_idx);
       array_[array_index * 8 + byte_idx] = std::pair<KeyType, ValueType>(key, value);
       readable_[array_index] = readable_[array_index] | (0B10000000 >> byte_idx);
-      //还要修改 occupied数组,将对应的位置1即可
+      // 还要修改 occupied数组,将对应的位置1即可
       occupied_[array_index] = occupied_[array_index] | (0B10000000 >> byte_idx);
       return true;
     }
@@ -81,14 +83,14 @@ bool HASH_TABLE_BUCKET_TYPE::Remove(KeyType key, ValueType value, KeyComparator 
 
   for (int array_index = 0; array_index <= readable_size; array_index++) {
     char reading_bytes = readable_[array_index];
-    // char occupired_bytes = occupied_[array_index];
+    char occupired_bytes = occupied_[array_index];
     for (int byte_idx = 0; byte_idx <= 7; byte_idx++) {
-      /* 并不能保证桶中的元素是否连续 ： 桶分裂可能破坏连续性，所以不能凭occupied数组加速查找过程 */
-      // if(! static_cast<bool>(occupired_bytes & (0B10000000 >> byte_idx))){
-      //   //加速探测过程
-      //   //occupied 的某个为为0 ， 表示这个为没有使用过，那么数组之后的元素也不可能使用过，直接返回false
-      //   return false;
-      // }
+      /*  */
+      if (!static_cast<bool>(occupired_bytes & (0B10000000 >> byte_idx))) {
+        // 加速探测过程
+        // occupied 的某个为为0 ， 表示这个为没有使用过，那么数组之后的元素也不可能使用过，直接返回false
+        return false;
+      }
 
       if (static_cast<bool>(reading_bytes & (0B10000000 >> byte_idx))) {
         // 这个位置还有元素，查看它的元素是否是要删除的元素
