@@ -151,6 +151,7 @@ bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
   HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(bucket_page_id);
 
   if (!bucket_page->IsFull()) {
+    // 如果bucket_page没有满，则不用再分裂了， 相当于递归的中终止条件
     bool ret = bucket_page->Insert(key, value, comparator_);
     buffer_pool_manager_->UnpinPage(bucket_page_id, true);
     buffer_pool_manager_->UnpinPage(directory_page_id_, true);
@@ -222,7 +223,7 @@ void HASH_TABLE_TYPE::ExpensionDirectory(HashTableDirectoryPage *dir_page) {
   dir_page->IncrGlobalDepth();
   // auto global_depth_now = dir_page->GetGlobalDepth();
   auto directory_size_now = dir_page->Size();
-  // 将原directory拷贝到现diretory的后半端中, 实际上拷贝的 bucket 的page_id，逻辑上是指针
+  // 将原directory拷贝到现diretory的后半段中, 实际上拷贝的 bucket 的page_id，逻辑上是指针
   for (uint32_t i = 0, j = directory_size_original; i <= directory_size_original - 1 && j <= directory_size_now - 1;
        i++, j++) {
     dir_page->SetBucketPageId(j, dir_page->GetBucketPageId(i));

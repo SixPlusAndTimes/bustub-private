@@ -85,18 +85,18 @@ HASH_TABLE_BUCKET_TYPE *HASH_TABLE_TYPE::FetchBucketPage(page_id_t bucket_page_i
  *****************************************************************************/
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_TYPE::GetValue(Transaction *transaction, const KeyType &key, std::vector<ValueType> *result) {
-  table_latch_.RLock();
-  auto dir_page = FetchDirectoryPage();
+  // table_latch_.RLock();
+  HashTableDirectoryPage *dir_page = FetchDirectoryPage();
   page_id_t bucket_page_id = KeyToPageId(key, dir_page);
-  auto *bucket_page = FetchBucketPage(bucket_page_id);
+  HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(bucket_page_id);
 
-  reinterpret_cast<Page *>(bucket_page)->RLatch();
+  // reinterpret_cast<Page *>(bucket_page)->RLatch();
   bool ret = bucket_page->GetValue(key, comparator_, result);  // 读取桶页内容前加页的读锁
-  reinterpret_cast<Page *>(bucket_page)->RUnlatch();
+  // reinterpret_cast<Page *>(bucket_page)->RUnlatch();
 
-  buffer_pool_manager_->UnpinPage(bucket_page_id, false, nullptr);
-  buffer_pool_manager_->UnpinPage(directory_page_id_, false, nullptr);
-  table_latch_.RUnlock();
+  buffer_pool_manager_->UnpinPage(bucket_page_id, false);
+  buffer_pool_manager_->UnpinPage(directory_page_id_, false);
+  // table_latch_.RUnlock();
   return ret;
 }
 
@@ -105,25 +105,28 @@ bool HASH_TABLE_TYPE::GetValue(Transaction *transaction, const KeyType &key, std
  *****************************************************************************/
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const ValueType &value) {
-  table_latch_.RLock();
-  auto dir_page = FetchDirectoryPage();
+  // table_latch_.RLock();
+  HashTableDirectoryPage *dir_page = FetchDirectoryPage();
   page_id_t bucket_page_id = KeyToPageId(key, dir_page);
-  auto *bucket_page = FetchBucketPage(bucket_page_id);
+  HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(bucket_page_id);
 
-  reinterpret_cast<Page *>(bucket_page)->WLatch();
-  bool ret = bucket_page->Insert(key, value, comparator_);
-  reinterpret_cast<Page *>(bucket_page)->WUnlatch();
+  // reinterpret_cast<Page *>(bucket_page)->WLatch();
+  bool insert_successed = bucket_page->Insert(key, value, comparator_);
+  // reinterpret_cast<Page *>(bucket_page)->WUnlatch();
 
-  buffer_pool_manager_->UnpinPage(bucket_page_id, true, nullptr);
-  buffer_pool_manager_->UnpinPage(directory_page_id_, false, nullptr);
-  table_latch_.RUnlock();
-  if (!ret && bucket_page->IsFull()) {
+  // bucket 页面被修改了
+  buffer_pool_manager_->UnpinPage(bucket_page_id, true);
+  // directory 页面没有被修改
+  buffer_pool_manager_->UnpinPage(directory_page_id_, false);
+  // table_latch_.RUnlock();
+  // 一定要在 split insert之前释放 hash table的读锁，因为split insert 要写锁，不然就死锁了 ！
+  if (!insert_successed && bucket_page->IsFull()) {
     LOG_DEBUG("Split Inserting...");
     printf("start split\n");
-    ret = SplitInsert(transaction, key, value);
+    insert_successed = SplitInsert(transaction, key, value);
   }
 
-  return ret;
+  return insert_successed;
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
@@ -136,22 +139,22 @@ bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
  *****************************************************************************/
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_TYPE::Remove(Transaction *transaction, const KeyType &key, const ValueType &value) {
-  table_latch_.RLock();
-  auto dir_page = FetchDirectoryPage();
-  auto bucker_page_id = KeyToPageId(key, dir_page);
+  // table_latch_.RLock();
+  HashTableDirectoryPage *dir_page = FetchDirectoryPage();
+  page_id_t bucker_page_id = KeyToPageId(key, dir_page);
   HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(bucker_page_id);
 
-  reinterpret_cast<Page *>(bucket_page)->WLatch();
+  // reinterpret_cast<Page *>(bucket_page)->WLatch();
   bool has_deleted = bucket_page->Remove(key, value, comparator_);
 
   // if(bucket_page->IsEmpty()) {}
 
-  reinterpret_cast<Page *>(bucket_page)->WUnlatch();
+  // reinterpret_cast<Page *>(bucket_page)->WUnlatch();
 
   // 不要忘记unpin页面！！
   buffer_pool_manager_->UnpinPage(directory_page_id_, true);
   buffer_pool_manager_->UnpinPage(bucker_page_id, true);
-  table_latch_.RUnlock();
+  // table_latch_.RUnlock();
   return has_deleted;
 }
 
