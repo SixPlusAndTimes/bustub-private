@@ -147,14 +147,7 @@ class HashTableBucketPage {
   std::vector<MappingType> GetAllItem();
 
   // 将char表示的数的index位数字位置为0
-  void RemoveBit(char *value, int index) {
-    char bit = static_cast<char>(1 << index);
-    char mask = 0;
-    // ^ 异或操作
-    // ～ 桉位取反
-    mask = static_cast<char>((~mask) ^ bit);
-    *value = static_cast<char>(*value & mask);
-  }
+  void RemoveBit(char *value, int index);
 
  private:
   // For more on BUCKET_ARRAY_SIZE see storage/page/hash_table_page_defs.h

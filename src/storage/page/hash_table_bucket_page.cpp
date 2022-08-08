@@ -13,6 +13,7 @@
 #include "storage/page/hash_table_bucket_page.h"
 #include <sys/types.h>
 #include <cassert>
+#include <cstdint>
 #include <iostream>
 #include <ostream>
 #include <utility>
@@ -32,7 +33,7 @@ bool HASH_TABLE_BUCKET_TYPE::GetValue(KeyType key, KeyComparator cmp, std::vecto
   for (uint32_t index = 0; index < static_cast<uint32_t>(BUCKET_ARRAY_SIZE); index++) {
     if (IsReadable(index)) {
       if (cmp(key, KeyAt(index)) == 0) {
-        result->push_back(ValueAt(index));
+        result->push_back(array_[index].second);
       }
     } else if (!IsOccupied(index)) {  // occupied数组加速查找
       break;
@@ -47,7 +48,7 @@ template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_BUCKET_TYPE::Insert(KeyType key, ValueType value, KeyComparator cmp) {
   int readable_size = sizeof(readable_);
   // assert(readable_size == (BUCKET_ARRAY_SIZE - 1) / 8 + 1);
-  for (int array_index = 0; array_index <= readable_size; array_index++) {
+  for (int array_index = 0; array_index < readable_size; array_index++) {
     char reading_bytes = readable_[array_index];
     for (int byte_idx = 0; byte_idx <= 7; byte_idx++) {
       if (static_cast<bool>(reading_bytes & (0B10000000 >> byte_idx))) {
@@ -128,23 +129,30 @@ ValueType HASH_TABLE_BUCKET_TYPE::ValueAt(uint32_t bucket_idx) const {
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
-void HASH_TABLE_BUCKET_TYPE::RemoveAt(uint32_t bucket_idx) {}
+void HASH_TABLE_BUCKET_TYPE::RemoveAt(uint32_t bucket_idx) {
+  SetUnreadable(bucket_idx);
+}
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_BUCKET_TYPE::IsOccupied(uint32_t bucket_idx) const {
-  int byte_idx = static_cast<int>(bucket_idx / 8);
-  int bit_idx = static_cast<int>(bucket_idx - byte_idx * 8);
+  uint32_t byte_idx = bucket_idx / 8;
+  uint32_t bit_idx = bucket_idx - byte_idx * 8;
   char byte = occupied_[byte_idx];
   return (byte & (0B10000000 >> bit_idx)) != 0;
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
-void HASH_TABLE_BUCKET_TYPE::SetOccupied(uint32_t bucket_idx) {}
+void HASH_TABLE_BUCKET_TYPE::SetOccupied(uint32_t bucket_idx) {
+  uint32_t byte_idx = static_cast<int>(bucket_idx / 8);
+  uint32_t bit_idx = static_cast<int>(bucket_idx % 8);
+  occupied_[byte_idx] |= (0B10000000 >> bit_idx);
+  assert(IsOccupied(bucket_idx));
+}
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_BUCKET_TYPE::IsReadable(uint32_t bucket_idx) const {
-  int byte_idx = static_cast<int>(bucket_idx / 8);
-  int bit_idx = static_cast<int>(bucket_idx - byte_idx * 8);
+  uint32_t byte_idx = bucket_idx / 8;
+  uint32_t bit_idx = bucket_idx % 8;
   char byte = readable_[byte_idx];
   // LOG_DEBUG("IsReadable(): byteindex = %d, bitindex = %d", byte_idx, bit_idx);
   // std::cout << "byte & (0B10000000 >> bit_idx) = " << (byte & (0B10000000 >> bit_idx)) << std::endl;
@@ -152,7 +160,12 @@ bool HASH_TABLE_BUCKET_TYPE::IsReadable(uint32_t bucket_idx) const {
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
-void HASH_TABLE_BUCKET_TYPE::SetReadable(uint32_t bucket_idx) {}
+void HASH_TABLE_BUCKET_TYPE::SetReadable(uint32_t bucket_idx) {
+  uint32_t byte_idx = static_cast<int>(bucket_idx / 8);
+  uint32_t bit_idx = static_cast<int>(bucket_idx % 8);
+  readable_[byte_idx] |= (0B10000000 >> bit_idx);
+  assert(IsReadable(bucket_idx));
+}
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_BUCKET_TYPE::IsFull() {
@@ -188,9 +201,19 @@ bool HASH_TABLE_BUCKET_TYPE::IsEmpty() {
   return true;
 }
 
+/** 自定义函数 **/
 template <typename KeyType, typename ValueType, typename KeyComparator>
 uint32_t HASH_TABLE_BUCKET_TYPE::Size() {  // 返回桶的大小
   return BUCKET_ARRAY_SIZE;
+}
+
+template <typename KeyType, typename ValueType, typename KeyComparator>
+void HASH_TABLE_BUCKET_TYPE::SetUnreadable(uint32_t bucket_idx) {
+  // 比如 bucket_idx =  23 => byte_idx = 2 , bit_idx = 7
+  uint32_t byte_index = bucket_idx / 8;
+  uint32_t bit_index = bucket_idx % 8;
+  readable_[byte_index] &= ~(0B10000000 >> bit_index);
+  assert(!IsReadable(bucket_idx));
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
@@ -204,6 +227,16 @@ std::vector<MappingType> HASH_TABLE_BUCKET_TYPE::GetAllItem() {
     }
   }
   return items;
+}
+
+template <typename KeyType, typename ValueType, typename KeyComparator>
+void HASH_TABLE_BUCKET_TYPE::RemoveBit(char *value, int index) {
+  char bit = static_cast<char>(1 << index);
+  char mask = 0;
+  // ^ 异或操作
+  // ～ 桉位取反
+  mask = static_cast<char>((~mask) ^ bit);
+  *value = static_cast<char>(*value & mask);
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>

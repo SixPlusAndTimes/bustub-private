@@ -85,18 +85,18 @@ HASH_TABLE_BUCKET_TYPE *HASH_TABLE_TYPE::FetchBucketPage(page_id_t bucket_page_i
  *****************************************************************************/
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_TYPE::GetValue(Transaction *transaction, const KeyType &key, std::vector<ValueType> *result) {
-  // table_latch_.RLock();
+  table_latch_.RLock();
   HashTableDirectoryPage *dir_page = FetchDirectoryPage();
   page_id_t bucket_page_id = KeyToPageId(key, dir_page);
   HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(bucket_page_id);
 
-  // reinterpret_cast<Page *>(bucket_page)->RLatch();
+  reinterpret_cast<Page *>(bucket_page)->RLatch();
   bool ret = bucket_page->GetValue(key, comparator_, result);  // 读取桶页内容前加页的读锁
-  // reinterpret_cast<Page *>(bucket_page)->RUnlatch();
+  reinterpret_cast<Page *>(bucket_page)->RUnlatch();
 
   buffer_pool_manager_->UnpinPage(bucket_page_id, false);
   buffer_pool_manager_->UnpinPage(directory_page_id_, false);
-  // table_latch_.RUnlock();
+  table_latch_.RUnlock();
   return ret;
 }
 
@@ -115,14 +115,14 @@ bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const
   // reinterpret_cast<Page *>(bucket_page)->WUnlatch();
 
   // bucket 页面被修改了
-  buffer_pool_manager_->UnpinPage(bucket_page_id, true);
+  buffer_pool_manager_->UnpinPage(bucket_page_id, true, nullptr);
   // directory 页面没有被修改
-  buffer_pool_manager_->UnpinPage(directory_page_id_, false);
+  buffer_pool_manager_->UnpinPage(directory_page_id_, false, nullptr);
   // table_latch_.RUnlock();
   // 一定要在 split insert之前释放 hash table的读锁，因为split insert 要写锁，不然就死锁了 ！
   if (!insert_successed && bucket_page->IsFull()) {
-    LOG_DEBUG("Split Inserting...");
-    printf("start split\n");
+    // LOG_DEBUG("Split Inserting...");
+    // printf("start split\n");
     insert_successed = SplitInsert(transaction, key, value);
   }
 
