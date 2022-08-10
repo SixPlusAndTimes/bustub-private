@@ -10,7 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <cassert>
+#include <cstdint>
 #include <iostream>
+#include <iterator>
+#include <ostream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -90,10 +94,21 @@ bool HASH_TABLE_TYPE::GetValue(Transaction *transaction, const KeyType &key, std
   page_id_t bucket_page_id = KeyToPageId(key, dir_page);
   HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(bucket_page_id);
 
+  /* for debug*/
+  // if (dir_page->GetGlobalDepth() == 1) {
+  //   std::cout << "search key = " << key << std::endl;
+  // }
+  /* for debug*/
+
   reinterpret_cast<Page *>(bucket_page)->RLatch();
   bool ret = bucket_page->GetValue(key, comparator_, result);  // 读取桶页内容前加页的读锁
   reinterpret_cast<Page *>(bucket_page)->RUnlatch();
 
+  /* for debug*/
+  // if (!ret && dir_page->GetGlobalDepth() >= 1) {
+  //   std::cout << "search failed!, search key = " << key << std::endl;
+  // }
+  /* for debug*/
   buffer_pool_manager_->UnpinPage(bucket_page_id, false);
   buffer_pool_manager_->UnpinPage(directory_page_id_, false);
   table_latch_.RUnlock();
@@ -105,24 +120,29 @@ bool HASH_TABLE_TYPE::GetValue(Transaction *transaction, const KeyType &key, std
  *****************************************************************************/
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const ValueType &value) {
-  // table_latch_.RLock();
+  table_latch_.RLock();
   HashTableDirectoryPage *dir_page = FetchDirectoryPage();
   page_id_t bucket_page_id = KeyToPageId(key, dir_page);
   HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(bucket_page_id);
 
-  // reinterpret_cast<Page *>(bucket_page)->WLatch();
+  // for debug
+  // if (value == static_cast<ValueType>(252)) {
+  //   std::cout << "key =  " << key << " value = " << value << std::endl;
+  //   std::cout << "hash to page " << bucket_page_id << std::endl;
+  //   // for debug
+  // }
+  reinterpret_cast<Page *>(bucket_page)->WLatch();
   bool insert_successed = bucket_page->Insert(key, value, comparator_);
-  // reinterpret_cast<Page *>(bucket_page)->WUnlatch();
+  reinterpret_cast<Page *>(bucket_page)->WUnlatch();
 
   // bucket 页面被修改了
   buffer_pool_manager_->UnpinPage(bucket_page_id, true, nullptr);
   // directory 页面没有被修改
   buffer_pool_manager_->UnpinPage(directory_page_id_, false, nullptr);
-  // table_latch_.RUnlock();
+  table_latch_.RUnlock();
   // 一定要在 split insert之前释放 hash table的读锁，因为split insert 要写锁，不然就死锁了 ！
   if (!insert_successed && bucket_page->IsFull()) {
     // LOG_DEBUG("Split Inserting...");
-    // printf("start split\n");
     insert_successed = SplitInsert(transaction, key, value);
   }
 
@@ -131,7 +151,142 @@ bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, const ValueType &value) {
-  return false;
+  // LOG_DEBUG("!!!!!!!!Recursively CallSplit Insert()!!!!!!");
+  table_latch_.WLock();
+  HashTableDirectoryPage *dir_page = FetchDirectoryPage();
+  auto bucket_idx = KeyToDirectoryIndex(key, dir_page);
+  auto bucket_page_id = KeyToPageId(key, dir_page);
+  HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(bucket_page_id);
+
+  if (!bucket_page->IsFull()) {
+    // 如果bucket_page没有满，则不用再分裂了， 相当于递归的中终止条件
+    // LOG_DEBUG("NO Need to split");
+    // std::cout << "last key : " << key << " hash to pageid = " << bucket_page_id << std::endl;
+    bool ret = bucket_page->Insert(key, value, comparator_);
+    buffer_pool_manager_->UnpinPage(bucket_page_id, true);
+    buffer_pool_manager_->UnpinPage(directory_page_id_, true);
+    // LOG_DEBUG("afer last key inserted, bucket condition : ");
+    // bucket_page->PrintBucket();
+    table_latch_.WUnlock();
+    return ret;
+  }
+
+  // 根据该buckut页面的local_depth 是否等于 global_depth有两种做法
+  //  如果local-depth == global_depth, 那么目录页面得增加一倍，然后分裂bucket，将原页面的键直对rehash
+  //  如果local-depth < global_depth, 那么仅分裂bucket即可
+  auto local_depth = dir_page->GetLocalDepth(bucket_idx);
+  auto global_depth = dir_page->GetGlobalDepth();
+  if (local_depth == global_depth) {
+    // Directory Expansion
+    // LOG_DEBUG("expension directory");
+    ExpensionDirectory(dir_page);
+    // LOG_DEBUG("after expension director, global depth = %d, diretory view:", dir_page->GetGlobalDepth());
+    // if (dir_page->GetGlobalDepth() <= 5) {
+    //   dir_page->PrintDirectory();
+    // }
+  } else {
+    // for debug
+    assert(global_depth > local_depth);
+    // for debug
+  }
+
+  auto split_image_idx = dir_page->GetSplitImageIndex(bucket_idx);
+  // LOG_DEBUG("bucket_idx = %d, image_idx = %d", bucket_idx, split_image_idx);
+  page_id_t split_bucket_page_id;
+  // 为分裂bucket创建新的页面
+  HASH_TABLE_BUCKET_TYPE *image_bucket_page =
+      reinterpret_cast<HashTableBucketPage<KeyType, ValueType, KeyComparator> *>(
+          buffer_pool_manager_->NewPage(&split_bucket_page_id)->GetData());
+  // buffer_pool_manager_->NewPage(&split_bucket_page_id);
+  // 在directory中设置bucket_image的 pageid
+  // dir_page->SetBucketPageId(split_image_idx, split_bucket_page_id);
+  auto local_mask_of_image = dir_page->GetLocalDepthMask(split_image_idx);
+  auto local_mask_of_original = dir_page->GetLocalDepthMask(bucket_idx);
+  assert(local_mask_of_image == local_mask_of_original);
+
+  for (uint32_t index = dir_page->Size() / 2; index < dir_page->Size(); index++) {
+    if ((index & local_mask_of_image) == (split_image_idx & local_mask_of_image)) {
+      dir_page->SetBucketPageId(index, split_bucket_page_id);
+      dir_page->IncrLocalDepth(index);
+    }
+  }
+
+  // 将direcotory的上半部分对应的bucket的localdepth加一
+  for (uint32_t index = 0; index < dir_page->Size() / 2; index++) {
+    if ((index & local_mask_of_original) == (bucket_idx & local_mask_of_original)) {
+      dir_page->IncrLocalDepth(index);
+    }
+  }
+
+  // LOG_DEBUG("IncrLocalDepth... and new bucket page, directory view : ");
+  // dir_page->PrintDirectory();
+  reinterpret_cast<Page *>(bucket_page)->WLatch();
+  reinterpret_cast<Page *>(image_bucket_page)->WLatch();
+
+  // LOG_DEBUG("=========================Now Starting Rehashing !========================");
+  // rehash所有原bucket中的元素 , 这个过程一定不会overflow
+  for (uint32_t i = 0; i < static_cast<uint32_t>(BUCKET_ARRAY_SIZE); i++) {
+    auto key_rehash = bucket_page->KeyAt(i);
+    auto value_rehash = bucket_page->ValueAt(i);
+
+    // for debug
+    // auto rehash_bucket_idx = KeyToDirectoryIndex(key_rehash, dir_page);
+    // if (rehash_bucket_idx < 0 || rehash_bucket_idx >= dir_page->Size()) {
+    //   std::cout << "something wrong here, rehash_bucket_idx < 0  or rehash_bucket_idx >= direcory size\n";
+    // }
+    // for debug
+
+    auto rehash_bucket_page_id = KeyToPageId(key_rehash, dir_page);
+
+    if (rehash_bucket_page_id == bucket_page_id) {
+      // std::cout << "key = " << key_rehash << " rehash to the original one" << std::endl;
+      // 该元素被hash到原来的bucket中，就不用做什么了
+      continue;
+    }
+    // 如果被hash到镜像bucket中，那么将它加入新的bucket，并且从老的bucket中删除
+    // assert(rehash_bucket_page_id != split_bucket_page_id);  // 此时一定在镜像bucket中
+    image_bucket_page->Insert(key_rehash, value_rehash, comparator_);
+    // TODO(ljc): RemoveAt可能会更快
+    bucket_page->Remove(key_rehash, value_rehash, comparator_);
+  }
+  // // LOG_DEBUG("===============Rehashing Complete!=================, direcotory page:");
+  // if (dir_page->GetGlobalDepth() == 1) {
+  //   dir_page->PrintDirectory();
+  //   LOG_DEBUG("==========bucket page :  ");
+  //   bucket_page->PrintBucket();
+  //   LOG_DEBUG("==========image_bucket page :  ");
+  //   image_bucket_page->PrintBucket();
+  // }
+
+  reinterpret_cast<Page *>(image_bucket_page)->WUnlatch();  // 注意加锁顺序
+  reinterpret_cast<Page *>(bucket_page)->WUnlatch();
+
+  buffer_pool_manager_->UnpinPage(bucket_page_id, true);
+  buffer_pool_manager_->UnpinPage(split_bucket_page_id, true);
+
+  // 不要忘记unpin页面,这里有3个！
+  buffer_pool_manager_->UnpinPage(directory_page_id_, true);
+
+  table_latch_.WUnlock();
+
+  // 递归调用insert
+  bool has_inserted = SplitInsert(transaction, key, value);
+  return has_inserted;
+}
+
+template <typename KeyType, typename ValueType, typename KeyComparator>
+void HASH_TABLE_TYPE::ExpensionDirectory(HashTableDirectoryPage *dir_page) {
+  auto directory_size_original = dir_page->Size();
+  // globaldepth加一
+  dir_page->IncrGlobalDepth();
+  // auto global_depth_now = dir_page->GetGlobalDepth();
+  auto directory_size_now = dir_page->Size();
+  // 将原directory拷贝到现diretory的后半段中, 实际上拷贝的 bucket 的page_id，逻辑上是指针
+  for (uint32_t i = 0, j = directory_size_original; i <= directory_size_original - 1 && j <= directory_size_now - 1;
+       i++, j++) {
+    dir_page->SetBucketPageId(j, dir_page->GetBucketPageId(i));
+    dir_page->SetLocalDepth(j, dir_page->GetLocalDepth(i));
+  }
 }
 
 /*****************************************************************************
@@ -139,22 +294,22 @@ bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
  *****************************************************************************/
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_TYPE::Remove(Transaction *transaction, const KeyType &key, const ValueType &value) {
-  // table_latch_.RLock();
+  table_latch_.RLock();
   HashTableDirectoryPage *dir_page = FetchDirectoryPage();
   page_id_t bucker_page_id = KeyToPageId(key, dir_page);
   HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(bucker_page_id);
 
-  // reinterpret_cast<Page *>(bucket_page)->WLatch();
+  reinterpret_cast<Page *>(bucket_page)->WLatch();
   bool has_deleted = bucket_page->Remove(key, value, comparator_);
 
   // if(bucket_page->IsEmpty()) {}
 
-  // reinterpret_cast<Page *>(bucket_page)->WUnlatch();
+  reinterpret_cast<Page *>(bucket_page)->WUnlatch();
 
   // 不要忘记unpin页面！！
   buffer_pool_manager_->UnpinPage(directory_page_id_, true);
   buffer_pool_manager_->UnpinPage(bucker_page_id, true);
-  // table_latch_.RUnlock();
+  table_latch_.RUnlock();
   return has_deleted;
 }
 

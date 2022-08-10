@@ -58,7 +58,7 @@ TEST(HashTableTest, SampleTest) {
     } else {
       EXPECT_TRUE(ht.Insert(nullptr, i, 2 * i));
     }
-    ht.Insert(nullptr, i, 2 * i);
+    EXPECT_FALSE(ht.Insert(nullptr, i, 2 * i));
     std::vector<int> res;
     ht.GetValue(nullptr, i, &res);
     if (i == 0) {
@@ -117,4 +117,73 @@ TEST(HashTableTest, SampleTest) {
   delete bpm;
 }
 
+TEST(HashTableTest, DIYTEST) {
+  auto *disk_manager = new DiskManager("test.db");
+  auto *bpm = new BufferPoolManagerInstance(50, disk_manager);
+  ExtendibleHashTable<int, int, IntComparator> ht("blah", bpm, IntComparator(), HashFunction<int>());
+
+  // insert a few values
+  for (int i = 0; i < 500; i++) {
+    ht.Insert(nullptr, i, i);
+    std::vector<int> res;
+    ht.GetValue(nullptr, i, &res);
+    EXPECT_EQ(1, res.size()) << "Failed to insert " << i << std::endl;
+    EXPECT_EQ(i, res[0]);
+  }
+  // ht.Insert(nullptr, 1342, 1342);
+  // ht.Insert(nullptr, 1444, 1444);
+  ht.VerifyIntegrity();
+
+  //   // check if the inserted values are all there
+  // for (int i = 0; i < 20000; i++) {
+  //   std::vector<int> res;
+  //   ht.GetValue(nullptr, i, &res);
+  //   EXPECT_EQ(1, res.size()) << "Failed to keep " << i << std::endl;
+  //   EXPECT_EQ(i, res[0]);
+  // }
+
+  // insert one more value for each key
+  for (int i = 0; i < 500; i++) {
+    if (i == 0) {
+      // duplicate values for the same key are not allowed
+      EXPECT_FALSE(ht.Insert(nullptr, i, 2 * i));
+    } else {
+      EXPECT_TRUE(ht.Insert(nullptr, i, 2 * i));
+    }
+    EXPECT_FALSE(ht.Insert(nullptr, i, 2 * i)) << "key = " << i;
+    std::vector<int> res;
+    ht.GetValue(nullptr, i, &res);
+    if (i == 0) {
+      // duplicate values for the same key are not allowed
+      EXPECT_EQ(1, res.size());
+      EXPECT_EQ(i, res[0]);
+    } else {
+      EXPECT_EQ(2, res.size()) << "key = " << i;
+      if (res[0] == i) {
+        EXPECT_EQ(2 * i, res[1]);
+      } else {
+        EXPECT_EQ(2 * i, res[0]);
+        EXPECT_EQ(i, res[1]);
+      }
+    }
+  }
+
+  // delete some values
+  // for (int i = 0; i < 400; i++) {
+  //   EXPECT_TRUE(ht.Remove(nullptr, i, i));
+  //   std::vector<int> res;
+  //   ht.GetValue(nullptr, i, &res);
+  //   if (i == 0) {
+  //     // (0, 0) is the only pair with key 0
+  //     EXPECT_EQ(0, res.size());
+  //   } else {
+  //     EXPECT_EQ(1, res.size());
+  //     EXPECT_EQ(2 * i, res[0]);
+  //   }
+  // }
+  disk_manager->ShutDown();
+  remove("test.db");
+  delete disk_manager;
+  delete bpm;
+}
 }  // namespace bustub

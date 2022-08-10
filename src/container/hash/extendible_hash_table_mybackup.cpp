@@ -211,9 +211,9 @@ bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
   table_latch_.WUnlock();
 
   // 递归调用insert
-  // bool has_inserted = SplitInsert(transaction, key, value);
-  // return has_inserted;
-  return true;
+  bool has_inserted = SplitInsert(transaction, key, value);
+  return has_inserted;
+  // return true;
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>

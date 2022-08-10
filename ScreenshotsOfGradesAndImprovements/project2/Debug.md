@@ -53,4 +53,18 @@ bool HASH_TABLE_BUCKET_TYPE::Insert(KeyType key, ValueType value, KeyComparator 
 
 两个本地测试其实不用加锁也可以通过，所以可以先把功能实现完成，去gradescope上检测以下(应该能拿30分)，然后再去实现线程安全
 
+# GetSplitImageIndex()
+将 bucktindex 的最高位至反即可
 
+这个没想出来，参考别人的才了解的
+
+# readable数组是不连续的
+在没有 split之前， 某一个bucket中的readable数组确实是连续的，但是在分裂后将bucket的元素rehash后，bucket中的元素就是不连续的了
+
+所以在`hash_table_bucket_page.cpp`中的 insert 逻辑不能查找空位以及判重同时进行
+
+必须先完整扫描bucket中的元素判重， 然后再插入
+
+这个BUG卡了我很久， 线上测试又看不出什么，最后还是自己仿照本地测试进行 splitinsert 后才发现错了
+
+不得不说本地测试是真的有点鸡肋。。。

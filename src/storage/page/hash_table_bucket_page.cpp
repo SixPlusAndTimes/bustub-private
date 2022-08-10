@@ -44,32 +44,57 @@ bool HASH_TABLE_BUCKET_TYPE::GetValue(KeyType key, KeyComparator cmp, std::vecto
 
 // 注意 ： 如果桶满或者
 // 键重复都返回false ！ 在遍历空位时应该判断是否重复
+// 注意： 桶split以后， readable数组是不连续的，不能遍历整个数组来同时查找空位的同时并判重 ！！！
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_BUCKET_TYPE::Insert(KeyType key, ValueType value, KeyComparator cmp) {
-  int readable_size = sizeof(readable_);
-  // assert(readable_size == (BUCKET_ARRAY_SIZE - 1) / 8 + 1);
-  for (int array_index = 0; array_index < readable_size; array_index++) {
-    char reading_bytes = readable_[array_index];
-    for (int byte_idx = 0; byte_idx <= 7; byte_idx++) {
-      if (static_cast<bool>(reading_bytes & (0B10000000 >> byte_idx))) {
-        // 某一位已经被占用，判断是否重复,使用cmp比较key，使用 == 号比较value
-        if ((cmp(array_[array_index * 8 + byte_idx].first, key) == 0) &&
-            array_[array_index * 8 + byte_idx].second == value) {
-          return false;
-        }
-        // 不重复则继续寻找下一个空位置
-        continue;
+  // int readable_size = sizeof(readable_);
+  // // assert(readable_size == (BUCKET_ARRAY_SIZE - 1) / 8 + 1);
+  // for (int array_index = 0; array_index < readable_size; array_index++) {
+  //   char reading_bytes = readable_[array_index];
+  //   for (int byte_idx = 0; byte_idx <= 7; byte_idx++) {
+  //     if (static_cast<bool>(reading_bytes & (0B10000000 >> byte_idx))) {
+  //       // 一位已经被占用，判断是否重复,使用cmp比较key，使用 == 号比较value
+  //       if ((cmp(array_[array_index * 8 + byte_idx].first, key) == 0) &&
+  //           array_[array_index * 8 + byte_idx].second == value) {
+  //         return false;
+  //       }
+  //       // 不重复则继续寻找下一个空位置
+  //       continue;
+  //     }
+  //     // 找到空位，插入即可
+  //     // LOG_DEBUG("Found free space, array_index = %d, byte_index = %d",array_index, byte_idx);
+  //     array_[array_index * 8 + byte_idx] = std::pair<KeyType, ValueType>(key, value);
+  //     readable_[array_index] = readable_[array_index] | (0B10000000 >> byte_idx);
+  //     // 还要修改 occupied数组,将对应的位置1即可
+  //     occupied_[array_index] = occupied_[array_index] | (0B10000000 >> byte_idx);
+  //     return true;
+  //   }
+  // }
+  // return false;
+  uint32_t bucket_array_size = BUCKET_ARRAY_SIZE;
+  uint32_t insert_index = bucket_array_size;  // 可以插入的位置
+  for (uint32_t i = 0; i < bucket_array_size; i++) {
+    if (IsReadable(i) && cmp(array_[i].first, key) == 0 && array_[i].second == value) {  // 是否存在相同的元素
+      return false;
+    }
+
+    if (!IsReadable(i)) {
+      if (insert_index == bucket_array_size) {
+        insert_index = i;
       }
-      // 找到空位，插入即可
-      // LOG_DEBUG("Found free space, array_index = %d, byte_index = %d",array_index, byte_idx);
-      array_[array_index * 8 + byte_idx] = std::pair<KeyType, ValueType>(key, value);
-      readable_[array_index] = readable_[array_index] | (0B10000000 >> byte_idx);
-      // 还要修改 occupied数组,将对应的位置1即可
-      occupied_[array_index] = occupied_[array_index] | (0B10000000 >> byte_idx);
-      return true;
+      if (!IsOccupied(i)) {  // 提前结束寻找
+        break;
+      }
     }
   }
-  return false;
+  if (insert_index == bucket_array_size) {  // bucket已满
+    return false;
+  }
+  array_[insert_index].first = key;
+  array_[insert_index].second = value;
+  SetOccupied(insert_index);  // 同时设置标志位
+  SetReadable(insert_index);
+  return true;
 }
 
 /**
