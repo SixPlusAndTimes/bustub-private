@@ -19,10 +19,12 @@
 #include <utility>
 #include <vector>
 
+#include "common/config.h"
 #include "common/exception.h"
 #include "common/logger.h"
 #include "common/rid.h"
 #include "container/hash/extendible_hash_table.h"
+#include "storage/page/hash_table_bucket_page.h"
 
 namespace bustub {
 
@@ -80,7 +82,8 @@ HashTableDirectoryPage *HASH_TABLE_TYPE::FetchDirectoryPage() {
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 HASH_TABLE_BUCKET_TYPE *HASH_TABLE_TYPE::FetchBucketPage(page_id_t bucket_page_id) {
-  auto bucket_page = reinterpret_cast<HASH_TABLE_BUCKET_TYPE *>(buffer_pool_manager_->FetchPage(bucket_page_id));
+  auto bucket_page =
+      reinterpret_cast<HASH_TABLE_BUCKET_TYPE *>(buffer_pool_manager_->FetchPage(bucket_page_id)->GetData());
   return bucket_page;
 }
 
@@ -184,10 +187,6 @@ bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
     // if (dir_page->GetGlobalDepth() <= 5) {
     //   dir_page->PrintDirectory();
     // }
-  } else {
-    // for debug
-    assert(global_depth > local_depth);
-    // for debug
   }
 
   auto split_image_idx = dir_page->GetSplitImageIndex(bucket_idx);
@@ -204,6 +203,7 @@ bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
   auto local_mask_of_original = dir_page->GetLocalDepthMask(bucket_idx);
   assert(local_mask_of_image == local_mask_of_original);
 
+  // 将directory的下半部分对应的bucket的localdeoth加一，并且将所有的镜像页设置为对应的page_id
   for (uint32_t index = dir_page->Size() / 2; index < dir_page->Size(); index++) {
     if ((index & local_mask_of_image) == (split_image_idx & local_mask_of_image)) {
       dir_page->SetBucketPageId(index, split_bucket_page_id);
@@ -274,6 +274,7 @@ bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
   return has_inserted;
 }
 
+// 自定义函数
 template <typename KeyType, typename ValueType, typename KeyComparator>
 void HASH_TABLE_TYPE::ExpensionDirectory(HashTableDirectoryPage *dir_page) {
   auto directory_size_original = dir_page->Size();
@@ -301,15 +302,16 @@ bool HASH_TABLE_TYPE::Remove(Transaction *transaction, const KeyType &key, const
 
   reinterpret_cast<Page *>(bucket_page)->WLatch();
   bool has_deleted = bucket_page->Remove(key, value, comparator_);
-
-  // if(bucket_page->IsEmpty()) {}
-
   reinterpret_cast<Page *>(bucket_page)->WUnlatch();
 
   // 不要忘记unpin页面！！
   buffer_pool_manager_->UnpinPage(directory_page_id_, true);
   buffer_pool_manager_->UnpinPage(bucker_page_id, true);
   table_latch_.RUnlock();
+  // 在释放读锁后调用merge，因为merge要获取写锁。 否则会引发死锁
+  if (bucket_page->IsEmpty()) {
+    Merge(transaction, key, value);
+  }
   return has_deleted;
 }
 
@@ -317,8 +319,53 @@ bool HASH_TABLE_TYPE::Remove(Transaction *transaction, const KeyType &key, const
  * MERGE
  *****************************************************************************/
 template <typename KeyType, typename ValueType, typename KeyComparator>
-void HASH_TABLE_TYPE::Merge(Transaction *transaction, const KeyType &key, const ValueType &value) {}
+void HASH_TABLE_TYPE::Merge(Transaction *transaction, const KeyType &key, const ValueType &value) {
+  table_latch_.WLock();
+  HashTableDirectoryPage *dir_page = FetchDirectoryPage();
+  page_id_t bucket_empty_page_id = KeyToPageId(key, dir_page);
+  uint32_t bucket_empty_index = KeyToDirectoryIndex(key, dir_page);
 
+  uint32_t bucket_image_index = dir_page->GetSplitImageIndex(bucket_empty_index);
+  page_id_t bucket_image_page_id = dir_page->GetBucketPageId(bucket_image_index);
+
+  auto ld_of_empty_bucket = dir_page->GetLocalDepth(bucket_empty_index);
+  auto ld_of_image_bucket = dir_page->GetLocalDepth(bucket_image_index);
+
+  HASH_TABLE_BUCKET_TYPE *empty_bucket = FetchBucketPage(bucket_empty_page_id);
+  // 判断是否能够合并
+  if (ld_of_empty_bucket > 0 && ld_of_empty_bucket == ld_of_image_bucket &&
+      bucket_empty_page_id != bucket_image_page_id &&
+      empty_bucket
+          ->IsEmpty()) {  // 再次判断bucket是否为空，是因为 remove 函数中是释放锁之后再 调用
+                          // Merge的，可能这之间已经有其他线程插入了某个值。否则会出现某名奇妙的内存错误（本地测试）！
+    // 删除空余的bucket页
+    reinterpret_cast<Page *>(empty_bucket)->WLatch();
+    buffer_pool_manager_->UnpinPage(bucket_empty_page_id, false);
+    buffer_pool_manager_->DeletePage(bucket_empty_page_id);
+    reinterpret_cast<Page *>(empty_bucket)->WUnlatch();
+    // 设置空页的pageid为image的pageid
+    dir_page->SetBucketPageId(bucket_empty_index, bucket_image_page_id);
+    // 减小局部深度
+    dir_page->DecrLocalDepth(bucket_empty_index);
+    dir_page->DecrLocalDepth(bucket_image_index);
+
+    ShrinkDirectory(dir_page);
+  }
+  table_latch_.WUnlock();
+}
+
+// 自定义函数
+template <typename KeyType, typename ValueType, typename KeyComparator>
+void HASH_TABLE_TYPE::ShrinkDirectory(HashTableDirectoryPage *dir_page) {
+  // 如果局部深度都小于全局深度 ， 则全局深度减1
+  auto global_depth = dir_page->GetGlobalDepth();
+  for (uint32_t i = 0; i < dir_page->Size(); i++) {
+    if (dir_page->GetLocalDepth(i) >= global_depth) {
+      return;
+    }
+  }
+  dir_page->DecrGlobalDepth();
+}
 /*****************************************************************************
  * GETGLOBALDEPTH - DO NOT TOUCH
  *****************************************************************************/

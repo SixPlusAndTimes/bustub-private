@@ -167,6 +167,7 @@ class ExtendibleHashTable {
 
   //自定义函数
   void ExpensionDirectory(HashTableDirectoryPage *dir_page);
+  void ShrinkDirectory(HashTableDirectoryPage *dir_page);
 
   // member variables
   page_id_t directory_page_id_;
