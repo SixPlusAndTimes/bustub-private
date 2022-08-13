@@ -302,7 +302,7 @@ bool HASH_TABLE_TYPE::Remove(Transaction *transaction, const KeyType &key, const
   HashTableDirectoryPage *dir_page = FetchDirectoryPage();
   page_id_t bucker_page_id = KeyToPageId(key, dir_page);
   HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(bucker_page_id);
-  
+
   reinterpret_cast<Page *>(bucket_page)->WLatch();
   // LOG_DEBUG("remove hash to page_id = %d", bucker_page_id);
   bool has_deleted = bucket_page->Remove(key, value, comparator_);
@@ -316,7 +316,8 @@ bool HASH_TABLE_TYPE::Remove(Transaction *transaction, const KeyType &key, const
   if (has_deleted && bucket_page->IsEmpty()) {
     // LOG_DEBUG("merge ! Before merge directory :");
     Merge(transaction, key, value);
-    while (ExtraMerge(transaction, key, value)) {}
+    while (ExtraMerge(transaction, key, value)) {
+    }
   }
   return has_deleted;
 }
@@ -353,16 +354,16 @@ void HASH_TABLE_TYPE::Merge(Transaction *transaction, const KeyType &key, const 
     dir_page->PrintDirectory();
     uint32_t dir_size = dir_page->Size();
     for (uint32_t idx = 0; idx < dir_size; idx++) {
-    auto bucket_page_id = dir_page->GetBucketPageId(idx);
-    HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(bucket_page_id);
-    bucket_page->PrintBucket();
-    buffer_pool_manager_->UnpinPage(bucket_page_id, false, nullptr);
-  }
+      auto bucket_page_id = dir_page->GetBucketPageId(idx);
+      HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(bucket_page_id);
+      bucket_page->PrintBucket();
+      buffer_pool_manager_->UnpinPage(bucket_page_id, false, nullptr);
+    }
     // for debug
 
     // 删除空余的bucket页
     reinterpret_cast<Page *>(empty_bucket)->WLatch();
-    LOG_DEBUG("delete page_id %d",bucket_empty_page_id);
+    LOG_DEBUG("delete page_id %d", bucket_empty_page_id);
     buffer_pool_manager_->UnpinPage(bucket_empty_page_id, false);
     buffer_pool_manager_->DeletePage(bucket_empty_page_id);
     reinterpret_cast<Page *>(empty_bucket)->WUnlatch();
@@ -385,7 +386,10 @@ void HASH_TABLE_TYPE::Merge(Transaction *transaction, const KeyType &key, const 
     ShrinkDirectory(dir_page);
   } else {
     LOG_DEBUG("Didn't merge");
-    LOG_DEBUG("ld_of_empty_bucket = %d , ld_of_empty_bucket = %d : ld_of_image_bucket %d, bucket_empty_page_id = %d , bucket_image_page_id = %d" ,ld_of_empty_bucket,ld_of_empty_bucket,ld_of_image_bucket,bucket_empty_page_id ,bucket_image_page_id);
+    LOG_DEBUG(
+        "ld_of_empty_bucket = %d , ld_of_empty_bucket = %d : ld_of_image_bucket %d, bucket_empty_page_id = %d , "
+        "bucket_image_page_id = %d",
+        ld_of_empty_bucket, ld_of_empty_bucket, ld_of_image_bucket, bucket_empty_page_id, bucket_image_page_id);
     LOG_DEBUG("...");
   }
   // debug
@@ -431,7 +435,7 @@ bool HASH_TABLE_TYPE::ExtraMerge(Transaction *transaction, const KeyType &key, c
 
   auto ld_of_not_empty_bucket = dir_page->GetLocalDepth(bucket_not_empty_index);
   auto ld_of_image_bucket = dir_page->GetLocalDepth(bucket_image_index);
-  
+
   HASH_TABLE_BUCKET_TYPE *image_bucket = FetchBucketPage(bucket_image_page_id);
   LOG_DEBUG("Enter ExtraMerge!!");
   // 判断是否能够合并
@@ -440,7 +444,7 @@ bool HASH_TABLE_TYPE::ExtraMerge(Transaction *transaction, const KeyType &key, c
     LOG_DEBUG("Extra Merge occur, merge page id = %d", bucket_page_id_not_empty);
     LOG_DEBUG("Before ExtraMerge : directory: ");
     dir_page->PrintDirectory();
-    
+
     has_merged = true;
     // 删除空余的bucket页
     reinterpret_cast<Page *>(image_bucket)->WLatch();
@@ -449,9 +453,9 @@ bool HASH_TABLE_TYPE::ExtraMerge(Transaction *transaction, const KeyType &key, c
     buffer_pool_manager_->DeletePage(bucket_image_page_id);
     reinterpret_cast<Page *>(image_bucket)->WUnlatch();
 
-    for(uint32_t index = 0; index < dir_page->Size(); index++) {
+    for (uint32_t index = 0; index < dir_page->Size(); index++) {
       auto page_id_tetcting = dir_page->GetBucketPageId(index);
-      if(page_id_tetcting == bucket_image_page_id) {
+      if (page_id_tetcting == bucket_image_page_id) {
         dir_page->SetBucketPageId(index, bucket_page_id_not_empty);
         dir_page->DecrLocalDepth(index);
       } else if (page_id_tetcting == bucket_page_id_not_empty) {
@@ -460,17 +464,19 @@ bool HASH_TABLE_TYPE::ExtraMerge(Transaction *transaction, const KeyType &key, c
     }
     ShrinkDirectory(dir_page);
 
-      LOG_DEBUG("After ExtraMerge : directory: ");
-      dir_page->PrintDirectory();
+    LOG_DEBUG("After ExtraMerge : directory: ");
+    dir_page->PrintDirectory();
   } else {
     // debug
     LOG_DEBUG("No extra merge here !");
-    if(!image_bucket->IsEmpty()) {
+    if (!image_bucket->IsEmpty()) {
       LOG_DEBUG("image_bucket is not empty");
     }
-    LOG_DEBUG("ld_of_image_bucket =  %d , ld_of_not_empty_bucket = %d, bucket_page_id_not_empty = %d, bucket_image_page_id = %d" ,
-      ld_of_image_bucket, ld_of_not_empty_bucket, bucket_page_id_not_empty,bucket_image_page_id);
-    //debug
+    LOG_DEBUG(
+        "ld_of_image_bucket =  %d , ld_of_not_empty_bucket = %d, bucket_page_id_not_empty = %d, bucket_image_page_id = "
+        "%d",
+        ld_of_image_bucket, ld_of_not_empty_bucket, bucket_page_id_not_empty, bucket_image_page_id);
+    // debug
   }
 
   if (has_merged) {

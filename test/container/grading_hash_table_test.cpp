@@ -372,7 +372,7 @@ void GrowShrinkTestCall(KeyType k /* unused */, ValueType v /* unused */, KeyCom
   LOG_DEBUG("=================== done ================");
   LOG_DEBUG("\n");
   ht.VerifyIntegrity();
- 
+
   LOG_DEBUG("insert 1000-1499");
   for (int i = 1000; i < 1500; i++) {
     auto key = GetKey<KeyType>(i);
@@ -383,7 +383,7 @@ void GrowShrinkTestCall(KeyType k /* unused */, ValueType v /* unused */, KeyCom
     EXPECT_EQ(1, res.size()) << "Failed to insert " << i << std::endl;
     EXPECT_EQ(value, res[0]);
   }
- 
+
   ht.PrintDir();
   LOG_DEBUG("=================== done ================");
   LOG_DEBUG("\n");
@@ -414,7 +414,7 @@ void GrowShrinkTestCall(KeyType k /* unused */, ValueType v /* unused */, KeyCom
     EXPECT_EQ(1, res.size()) << "Failed to insert " << i << std::endl;
     EXPECT_EQ(value, res[0]);
   }
- 
+
   ht.PrintDir();
   LOG_DEBUG("=================== done ================");
   LOG_DEBUG("\n");
@@ -429,7 +429,7 @@ void GrowShrinkTestCall(KeyType k /* unused */, ValueType v /* unused */, KeyCom
     EXPECT_FALSE(ht.GetValue(nullptr, key, &res));
     EXPECT_EQ(0, res.size()) << "Found non-existent key " << i << std::endl;
   }
-  
+
   ht.PrintDir();
   LOG_DEBUG("=================== done ================");
   LOG_DEBUG("\n");
@@ -444,7 +444,7 @@ void GrowShrinkTestCall(KeyType k /* unused */, ValueType v /* unused */, KeyCom
     EXPECT_FALSE(ht.GetValue(nullptr, key, &res));
     EXPECT_EQ(0, res.size()) << "Found non-existent key " << i << std::endl;
   }
-  
+
   ht.PrintDir();
   LOG_DEBUG("=================== done ================");
   LOG_DEBUG("\n");
@@ -457,13 +457,13 @@ void GrowShrinkTestCall(KeyType k /* unused */, ValueType v /* unused */, KeyCom
     auto value = GetValue<ValueType>(i);
     ht.Remove(nullptr, key, value);
   }
-  
+
   ht.PrintDir();
   LOG_DEBUG("=================== done ================");
   LOG_DEBUG("\n");
   // debug
   // ht.PrintDir();
-  
+
   assert(ht.GetGlobalDepth() <= 1);
   ht.VerifyIntegrity();
 
@@ -511,12 +511,12 @@ TEST(HashTableTest, SplitGrowTest) {
 
 TEST(HashTableTest, GrowShrinkTest) {
   GrowShrinkTestCall(1, 1, IntComparator());
-  
+
   GenericTestCall<GenericKey<8>, RID, GenericComparator<8>>(GrowShrinkTestCall);
   LOG_DEBUG("==========================================ket 16 start ============================================");
   GenericTestCall<GenericKey<16>, RID, GenericComparator<16>>(GrowShrinkTestCall);
   GenericTestCall<GenericKey<32>, RID, GenericComparator<32>>(GrowShrinkTestCall);
-   LOG_DEBUG("==========================================ket 64 start ============================================");
+  LOG_DEBUG("==========================================ket 64 start ============================================");
   GenericTestCall<GenericKey<64>, RID, GenericComparator<64>>(GrowShrinkTestCall);
 }
 

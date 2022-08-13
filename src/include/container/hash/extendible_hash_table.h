@@ -85,9 +85,10 @@ class ExtendibleHashTable {
    * Helper function to verify the integrity of the extendible hash table's directory.  Do not touch.
    */
   void VerifyIntegrity();
-  
-  // 测试i方法 
+
+  // 测试i方法
   void PrintDir();
+
  private:
   /**
    * Hash - simple helper to downcast MurmurHash's 64-bit hash to 32-bit
@@ -176,7 +177,7 @@ class ExtendibleHashTable {
   HashTableDirectoryPage *CreateDirectoryPage(page_id_t *bucket_page_id);
   HASH_TABLE_BUCKET_TYPE *CreateBucketPage(page_id_t *bucket_page_id);
   void RemoveAllItem(Transaction *transaction, uint32_t bucket_idx);
- 
+
   // member variables
   page_id_t directory_page_id_;
   BufferPoolManager *buffer_pool_manager_;
