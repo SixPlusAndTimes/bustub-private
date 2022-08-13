@@ -97,3 +97,17 @@ uint32_t HashTableDirectoryPage::GetSplitImageIndex(uint32_t bucket_idx) {
 
 
 
+# SEGV
+
+
+这个错误具体是说在我执行 IsEmpty() 或者 对bucket 加锁时，会获取`未定义`的页面
+
+发生这个错误的原因大概率是`没有及时unpin不用的页面`
+
+而且在一开始可以设置unping的flag全部为true， 之后为了效率考虑再细化
+
+虽然在这里记录这个bug显得很随意，但是是我调的时间最长的BUG了， 一度想要放弃。之后抱着试试的心态旅顺unpin的逻辑并将 flag改称true后，奇迹般地通过测试了。
+
+还有感谢从gradescope上扒下来测试代码的大佬， 如果不能本地测试，我感觉我一个月也调不出来了。。。
+
+吐槽 ： gradescope的日志输出很有能被截断(truncated)，导致我根本不知道在哪里错了
