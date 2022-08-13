@@ -58,6 +58,8 @@ bool HASH_TABLE_BUCKET_TYPE::Insert(KeyType key, ValueType value, KeyComparator 
 
 这个没想出来，参考别人的才了解的
 
+但是没有按照他的写，自己琢磨了一个
+
 # readable数组是不连续的
 在没有 split之前， 某一个bucket中的readable数组确实是连续的，但是在分裂后将bucket的元素rehash后，bucket中的元素就是不连续的了
 
@@ -68,33 +70,6 @@ bool HASH_TABLE_BUCKET_TYPE::Insert(KeyType key, ValueType value, KeyComparator 
 这个BUG卡了我很久， 线上测试又看不出什么，最后还是自己仿照本地测试进行 splitinsert 后才发现错了
 
 不得不说本地测试是真的有点鸡肋。。。
-
-# uint32_t HashTableDirectoryPage::GetSplitImageIndex()
-一开始是写错的前几个测试都通过了，卡在了80分。
-
-百思不得解
-
-看了一眼别人的博客，好像是GetSplitImageIndex这个函数写错了。。。
-
-~~~cpp
-uint32_t HashTableDirectoryPage::GetSplitImageIndex(uint32_t bucket_idx) {
-  // 以下为错误写法
-  uint32_t mid = (1 << global_depth_) / 2;
-  if (bucket_idx < mid) {
-    return mid + bucket_idx;
-  }
-  return bucket_idx - mid;
-}
-~~~
-
-一开始想这应该只和 global depth 有关，所以一直往这上面想 ： 逻辑上将数组分成两半， 将一个输入index在一边的偏移加到另一边就得到了imge的index。
-
-想了一晚上总算知道问题出在哪里了 ： 
-
-如下图，00 的镜像 10，
-
-![img](project2_GetSplitImage.png)
-
 
 
 # SEGV
@@ -108,6 +83,16 @@ uint32_t HashTableDirectoryPage::GetSplitImageIndex(uint32_t bucket_idx) {
 
 虽然在这里记录这个bug显得很随意，但是是我调的时间最长的BUG了， 一度想要放弃。之后抱着试试的心态旅顺unpin的逻辑并将 flag改称true后，奇迹般地通过测试了。
 
-还有感谢从gradescope上扒下来测试代码的大佬， 如果不能本地测试，我感觉我一个月也调不出来了。。。
+
+
+# project2 总结
+好像有很多要总结的，之后再详细做个笔记吧。
+
+体感project2的难度 与project1的难度 差了一个数量级， 对一个非科班学生来说，第一次正经的CS LAB尝试真的太困难了。DEBUG是一件非常痛苦的事，但是看着gradescope的满分时，还是有满满的成就感。
+![img](./project2_fullmarks.png)
+
+![img](./project2_leadbord.png)
+
+感谢从gradescope上扒下来测试代码的大佬， 如果不能本地测试，我感觉我一个月也调不出来了。。。
 
 吐槽 ： gradescope的日志输出很有能被截断(truncated)，导致我根本不知道在哪里错了

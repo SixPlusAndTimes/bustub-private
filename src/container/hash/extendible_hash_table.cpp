@@ -407,7 +407,7 @@ void HASH_TABLE_TYPE::Merge(Transaction *transaction, const KeyType &key, const 
   // debug
   // 别忘了unpin这个页面， 本来向写一个标志位判断来者，但是不知道为什么总是 segv ， 还是直接true
   buffer_pool_manager_->UnpinPage(bucket_empty_page_id, true);
-  
+
   buffer_pool_manager_->UnpinPage(directory_page_id_, true);
   table_latch_.WUnlock();
 }
