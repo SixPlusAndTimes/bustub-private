@@ -349,16 +349,16 @@ void HASH_TABLE_TYPE::Merge(Transaction *transaction, const KeyType &key, const 
           ->IsEmpty()) {  // 再次判断bucket是否为空，是因为 remove 函数中是释放锁之后再 调用
                           // Merge的，可能这之间已经有其他线程插入了某个值。否则会出现某名奇妙的内存错误（本地测试）！
     // for debug
-    LOG_DEBUG("Merge occur , before merge :");
-    dir_page->PrintDirectory();
-    uint32_t dir_size = dir_page->Size();
-    for (uint32_t idx = 0; idx < dir_size; idx++) {
-      auto bucket_page_id = dir_page->GetBucketPageId(idx);
-      HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(bucket_page_id);
-      LOG_DEBUG("BucketIndex = %d" , idx);
-      bucket_page->PrintBucket();
-      buffer_pool_manager_->UnpinPage(bucket_page_id, false, nullptr);
-    }
+    // LOG_DEBUG("Merge occur , before merge :");
+    // dir_page->PrintDirectory();
+    // uint32_t dir_size = dir_page->Size();
+    // for (uint32_t idx = 0; idx < dir_size; idx++) {
+    //   auto bucket_page_id = dir_page->GetBucketPageId(idx);
+    //   HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(bucket_page_id);
+    //   LOG_DEBUG("BucketIndex = %d" , idx);
+    //   bucket_page->PrintBucket();
+    //   buffer_pool_manager_->UnpinPage(bucket_page_id, false, nullptr);
+    // }
     // for debug
 
     // 删除空余的bucket页
@@ -393,17 +393,17 @@ void HASH_TABLE_TYPE::Merge(Transaction *transaction, const KeyType &key, const 
     LOG_DEBUG("...");
   }
   // debug
-  LOG_DEBUG("after merger directory");
-  dir_page->PrintDirectory();
-  uint32_t dir_size = dir_page->Size();
-  for (uint32_t idx = 0; idx < dir_size; idx++) {
-    auto bucket_page_id = dir_page->GetBucketPageId(idx);
-    HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(bucket_page_id);
-    LOG_DEBUG("BucketIndex = %d" , idx);
-    bucket_page->PrintBucket();
-    buffer_pool_manager_->UnpinPage(bucket_page_id, false, nullptr);
-  }
-  LOG_DEBUG("...");
+  // LOG_DEBUG("after merger directory");
+  // dir_page->PrintDirectory();
+  // uint32_t dir_size = dir_page->Size();
+  // for (uint32_t idx = 0; idx < dir_size; idx++) {
+  //   auto bucket_page_id = dir_page->GetBucketPageId(idx);
+  //   HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(bucket_page_id);
+  //   LOG_DEBUG("BucketIndex = %d" , idx);
+  //   bucket_page->PrintBucket();
+  //   buffer_pool_manager_->UnpinPage(bucket_page_id, false, nullptr);
+  // }
+  // LOG_DEBUG("...");
   // debug
   buffer_pool_manager_->UnpinPage(directory_page_id_, true);
   table_latch_.WUnlock();
