@@ -14,9 +14,11 @@
 
 #include <queue>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "buffer/buffer_pool_manager.h"
+#include "common/config.h"
 #include "concurrency/transaction.h"
 #include "container/hash/hash_function.h"
 #include "storage/page/hash_table_bucket_page.h"
@@ -83,7 +85,9 @@ class ExtendibleHashTable {
    * Helper function to verify the integrity of the extendible hash table's directory.  Do not touch.
    */
   void VerifyIntegrity();
-
+  
+  // 测试i方法 
+  void PrintDir();
  private:
   /**
    * Hash - simple helper to downcast MurmurHash's 64-bit hash to 32-bit
@@ -168,7 +172,11 @@ class ExtendibleHashTable {
   //自定义函数
   void ExpensionDirectory(HashTableDirectoryPage *dir_page);
   void ShrinkDirectory(HashTableDirectoryPage *dir_page);
-
+  bool ExtraMerge(Transaction *transaction, const KeyType &key, const ValueType &value);
+  HashTableDirectoryPage *CreateDirectoryPage(page_id_t *bucket_page_id);
+  HASH_TABLE_BUCKET_TYPE *CreateBucketPage(page_id_t *bucket_page_id);
+  void RemoveAllItem(Transaction *transaction, uint32_t bucket_idx);
+ 
   // member variables
   page_id_t directory_page_id_;
   BufferPoolManager *buffer_pool_manager_;
@@ -177,6 +185,9 @@ class ExtendibleHashTable {
   // Readers includes inserts and removes, writers are splits and merges
   ReaderWriterLatch table_latch_;
   HashFunction<KeyType> hash_fn_;
+
+  // for debug
+  // std::unordered_map<page_id_t, page_id_t> is_deleted_;
 };
 
 }  // namespace bustub

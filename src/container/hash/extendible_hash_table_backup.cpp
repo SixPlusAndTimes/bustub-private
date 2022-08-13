@@ -316,7 +316,7 @@ bool HASH_TABLE_TYPE::Remove(Transaction *transaction, const KeyType &key, const
   if (has_deleted && bucket_page->IsEmpty()) {
     // LOG_DEBUG("merge ! Before merge directory :");
     Merge(transaction, key, value);
-    ExtraMerge(transaction, key, value);
+    while (ExtraMerge(transaction, key, value)) {}
   }
   return has_deleted;
 }
@@ -354,8 +354,8 @@ void HASH_TABLE_TYPE::Merge(Transaction *transaction, const KeyType &key, const 
     uint32_t dir_size = dir_page->Size();
     for (uint32_t idx = 0; idx < dir_size; idx++) {
     auto bucket_page_id = dir_page->GetBucketPageId(idx);
-    // HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(bucket_page_id);
-    // bucket_page->PrintBucket();
+    HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(bucket_page_id);
+    bucket_page->PrintBucket();
     buffer_pool_manager_->UnpinPage(bucket_page_id, false, nullptr);
   }
     // for debug
@@ -389,16 +389,16 @@ void HASH_TABLE_TYPE::Merge(Transaction *transaction, const KeyType &key, const 
     LOG_DEBUG("...");
   }
   // debug
-  // LOG_DEBUG("after merger directory");
-  // dir_page->PrintDirectory();
-  // uint32_t dir_size = dir_page->Size();
-  // for (uint32_t idx = 0; idx < dir_size; idx++) {
-  //   auto bucket_page_id = dir_page->GetBucketPageId(idx);
-  //   // HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(bucket_page_id);
-  //   // bucket_page->PrintBucket();
-  //   buffer_pool_manager_->UnpinPage(bucket_page_id, false, nullptr);
-  // }
-  // LOG_DEBUG("...");
+  LOG_DEBUG("after merger directory");
+  dir_page->PrintDirectory();
+  uint32_t dir_size = dir_page->Size();
+  for (uint32_t idx = 0; idx < dir_size; idx++) {
+    auto bucket_page_id = dir_page->GetBucketPageId(idx);
+    HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(bucket_page_id);
+    bucket_page->PrintBucket();
+    buffer_pool_manager_->UnpinPage(bucket_page_id, false, nullptr);
+  }
+  LOG_DEBUG("...");
   // debug
   buffer_pool_manager_->UnpinPage(directory_page_id_, true);
   table_latch_.WUnlock();
@@ -420,58 +420,68 @@ void HASH_TABLE_TYPE::ShrinkDirectory(HashTableDirectoryPage *dir_page) {
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_TYPE::ExtraMerge(Transaction *transaction, const KeyType &key, const ValueType &value) {
   table_latch_.WLock();
-  // 扫描整个目录看看是否有空的bucket， 如果有则合并
-  bool has_merged = false;  // 标记每次否合并操作
-  bool has_merged_all = false; // 标记整个循环是否有合并操作
+  bool has_merged = false;  // 标记是否合并
   // extra merge 的 key 再次hash到的bucket一定不是空， 但是经过shrink后要检查这个桶的镜像桶是否为空，如果是则合并
   HashTableDirectoryPage *dir_page = FetchDirectoryPage();
+  page_id_t bucket_page_id_not_empty = KeyToPageId(key, dir_page);
+  uint32_t bucket_not_empty_index = KeyToDirectoryIndex(key, dir_page);
+
+  uint32_t bucket_image_index = dir_page->GetSplitImageIndex(bucket_not_empty_index);
+  page_id_t bucket_image_page_id = dir_page->GetBucketPageId(bucket_image_index);
+
+  auto ld_of_not_empty_bucket = dir_page->GetLocalDepth(bucket_not_empty_index);
+  auto ld_of_image_bucket = dir_page->GetLocalDepth(bucket_image_index);
   
-  for(uint32_t index = 0; index < dir_page->Size(); index++) {
-    page_id_t bucket_to_be_detected_page_id = dir_page->GetBucketPageId(index);
-    HASH_TABLE_BUCKET_TYPE * bucket_to_be_detected = FetchBucketPage(bucket_to_be_detected_page_id);
-    if(bucket_to_be_detected->IsEmpty()) {
-      uint32_t bucket_image_index = dir_page->GetSplitImageIndex(index);
-      page_id_t bucket_image_page_id = dir_page->GetBucketPageId(bucket_image_index);
+  HASH_TABLE_BUCKET_TYPE *image_bucket = FetchBucketPage(bucket_image_page_id);
+  LOG_DEBUG("Enter ExtraMerge!!");
+  // 判断是否能够合并
+  if (image_bucket->IsEmpty() && ld_of_image_bucket > 0 && (ld_of_not_empty_bucket == ld_of_image_bucket) &&
+      (bucket_page_id_not_empty != bucket_image_page_id)) {
+    LOG_DEBUG("Extra Merge occur, merge page id = %d", bucket_page_id_not_empty);
+    LOG_DEBUG("Before ExtraMerge : directory: ");
+    dir_page->PrintDirectory();
+    
+    has_merged = true;
+    // 删除空余的bucket页
+    reinterpret_cast<Page *>(image_bucket)->WLatch();
+    LOG_DEBUG("delete pageid = %d", bucket_image_page_id);
+    buffer_pool_manager_->UnpinPage(bucket_image_page_id, false);
+    buffer_pool_manager_->DeletePage(bucket_image_page_id);
+    reinterpret_cast<Page *>(image_bucket)->WUnlatch();
 
-      auto ld_of_original_bucket = dir_page->GetLocalDepth(index);
-      auto ld_of_image_bucket = dir_page->GetLocalDepth(bucket_image_index);
-      // 判断是否能够合并
-     if (ld_of_original_bucket > 0 && (ld_of_original_bucket == ld_of_image_bucket) &&
-        (bucket_to_be_detected_page_id != bucket_image_page_id)) {
-          has_merged = true;
-          has_merged_all = true;
-        // 删除空余的bucket页
-        reinterpret_cast<Page *>(bucket_to_be_detected)->WLatch();
-        LOG_DEBUG("delete pageid = %d", bucket_to_be_detected_page_id);
-        buffer_pool_manager_->UnpinPage(bucket_to_be_detected_page_id, false);
-        buffer_pool_manager_->DeletePage(bucket_to_be_detected_page_id);
-        reinterpret_cast<Page *>(bucket_to_be_detected)->WUnlatch();
-
-        for(uint32_t index = 0; index < dir_page->Size(); index++) {
-          auto page_id_tetcting = dir_page->GetBucketPageId(index);
-          if(page_id_tetcting == bucket_to_be_detected_page_id) {
-            dir_page->SetBucketPageId(index, bucket_image_page_id);
-            dir_page->DecrLocalDepth(index);
-          } else if (page_id_tetcting == bucket_image_page_id) {
-            dir_page->DecrLocalDepth(index);
-          }
-        }
-        ShrinkDirectory(dir_page);
+    for(uint32_t index = 0; index < dir_page->Size(); index++) {
+      auto page_id_tetcting = dir_page->GetBucketPageId(index);
+      if(page_id_tetcting == bucket_image_page_id) {
+        dir_page->SetBucketPageId(index, bucket_page_id_not_empty);
+        dir_page->DecrLocalDepth(index);
+      } else if (page_id_tetcting == bucket_page_id_not_empty) {
+        dir_page->DecrLocalDepth(index);
       }
     }
-    if (has_merged) {
-      has_merged = false;
-    }else {
-      buffer_pool_manager_->UnpinPage(bucket_to_be_detected_page_id, false);
+    ShrinkDirectory(dir_page);
+
+      LOG_DEBUG("After ExtraMerge : directory: ");
+      dir_page->PrintDirectory();
+  } else {
+    // debug
+    LOG_DEBUG("No extra merge here !");
+    if(!image_bucket->IsEmpty()) {
+      LOG_DEBUG("image_bucket is not empty");
     }
+    LOG_DEBUG("ld_of_image_bucket =  %d , ld_of_not_empty_bucket = %d, bucket_page_id_not_empty = %d, bucket_image_page_id = %d" ,
+      ld_of_image_bucket, ld_of_not_empty_bucket, bucket_page_id_not_empty,bucket_image_page_id);
+    //debug
   }
-  if(has_merged_all) {
+
+  if (has_merged) {
     buffer_pool_manager_->UnpinPage(directory_page_id_, true);
   } else {
+    buffer_pool_manager_->UnpinPage(bucket_image_page_id, false);
     buffer_pool_manager_->UnpinPage(directory_page_id_, false);
   }
   table_latch_.WUnlock();
-  return has_merged_all;
+
+  return has_merged;
 }
 // 用来debug
 template <typename KeyType, typename ValueType, typename KeyComparator>

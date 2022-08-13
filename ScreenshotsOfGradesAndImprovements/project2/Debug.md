@@ -68,3 +68,32 @@ bool HASH_TABLE_BUCKET_TYPE::Insert(KeyType key, ValueType value, KeyComparator 
 这个BUG卡了我很久， 线上测试又看不出什么，最后还是自己仿照本地测试进行 splitinsert 后才发现错了
 
 不得不说本地测试是真的有点鸡肋。。。
+
+# uint32_t HashTableDirectoryPage::GetSplitImageIndex()
+一开始是写错的前几个测试都通过了，卡在了80分。
+
+百思不得解
+
+看了一眼别人的博客，好像是GetSplitImageIndex这个函数写错了。。。
+
+~~~cpp
+uint32_t HashTableDirectoryPage::GetSplitImageIndex(uint32_t bucket_idx) {
+  // 以下为错误写法
+  uint32_t mid = (1 << global_depth_) / 2;
+  if (bucket_idx < mid) {
+    return mid + bucket_idx;
+  }
+  return bucket_idx - mid;
+}
+~~~
+
+一开始想这应该只和 global depth 有关，所以一直往这上面想 ： 逻辑上将数组分成两半， 将一个输入index在一边的偏移加到另一边就得到了imge的index。
+
+想了一晚上总算知道问题出在哪里了 ： 
+
+如下图，00 的镜像 10，
+
+![img](project2_GetSplitImage.png)
+
+
+

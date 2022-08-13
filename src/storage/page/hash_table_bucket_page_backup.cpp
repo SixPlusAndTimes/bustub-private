@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "storage/page/hash_table_bucket_page.h"
 #include <sys/types.h>
 #include <cassert>
 #include <cstdint>
@@ -21,6 +20,7 @@
 #include "common/util/hash_util.h"
 #include "storage/index/generic_key.h"
 #include "storage/index/hash_comparator.h"
+#include "storage/page/hash_table_bucket_page.h"
 #include "storage/page/hash_table_page_defs.h"
 #include "storage/table/tmp_tuple.h"
 
@@ -87,14 +87,34 @@ bool HASH_TABLE_BUCKET_TYPE::Insert(KeyType key, ValueType value, KeyComparator 
  */
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_BUCKET_TYPE::Remove(KeyType key, ValueType value, KeyComparator cmp) {
-  uint32_t bucket_array_size = BUCKET_ARRAY_SIZE;
-  for (uint32_t i = 0; i < bucket_array_size; i++) {
-    if (IsReadable(i) && cmp(array_[i].first, key) == 0 && array_[i].second == value) {
-      SetUnreadable(i);  // 将readavle数组的对应位设置为不可读就算是删除了
-      return true;
-    }
-    if (!IsOccupied(i)) {  // 提前结束寻找
-      break;
+  int readable_size = sizeof(readable_);
+  // assert(readable_size == (BUCKET_ARRAY_SIZE - 1) / 8 + 1);
+
+  for (int array_index = 0; array_index <= readable_size; array_index++) {
+    char reading_bytes = readable_[array_index];
+    char occupired_bytes = occupied_[array_index];
+    for (int byte_idx = 0; byte_idx <= 7; byte_idx++) {
+      /*  */
+      if (!static_cast<bool>(occupired_bytes & (0B10000000 >> byte_idx))) {
+        // 加速探测过程
+        // occupied 的某个为为0 ， 表示这个为没有使用过，那么数组之后的元素也不可能使用过，直接返回false
+        return false;
+      }
+
+      if (static_cast<bool>(reading_bytes & (0B10000000 >> byte_idx))) {
+        // 这个位置还有元素，查看它的元素是否是要删除的元素
+        if ((cmp(array_[array_index * 8 + byte_idx].first, key) == 0) &&
+            array_[array_index * 8 + byte_idx].second == value) {
+          // std::cout << "remove key = " << key << " remove value = " << value <<std::endl;
+          // LOG_DEBUG("Rmove Element , array index = %d, bit index = %d", array_index, byte_idx);
+          // std::cout << "actual remove key = " << array_[array_index * 8 + byte_idx].first <<std::endl;
+          // 如果是则删除它，只需要将readable数组对应的位设置为0即可
+          RemoveBit(&readable_[array_index], 7 - byte_idx);
+          // std::cout << "readable_[array_index] & (0B10000000 >> byte_idx) = " << (readable_[array_index] &
+          // (0B10000000 >> byte_idx)) <<std::endl; assert((readable_[array_index] & (0B10000000 >> byte_idx)) == 0);
+          return true;
+        }
+      }
     }
   }
   return false;
@@ -124,7 +144,7 @@ void HASH_TABLE_BUCKET_TYPE::RemoveAt(uint32_t bucket_idx) {
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_BUCKET_TYPE::IsOccupied(uint32_t bucket_idx) const {
   uint32_t byte_idx = bucket_idx / 8;
-  uint32_t bit_idx = static_cast<int>(bucket_idx % 8);
+  uint32_t bit_idx = bucket_idx - byte_idx * 8;
   char byte = occupied_[byte_idx];
   return (byte & (0B10000000 >> bit_idx)) != 0;
 }
@@ -181,18 +201,8 @@ uint32_t HASH_TABLE_BUCKET_TYPE::NumReadable() {
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_BUCKET_TYPE::IsEmpty() {
-  // LOG_DEBUG("EnterIsEmpty..");
-  // for (uint32_t index = 0; index < static_cast<uint32_t>(BUCKET_ARRAY_SIZE); index++) {
-  //   if (IsReadable(index)) {
-  //     return false;
-  //   }
-  // }
-  // // LOG_DEBUG("IsEmpty Return");
-  // return true;
-  // 判断字节速度快一些
-  uint32_t read_array_size = (BUCKET_ARRAY_SIZE - 1) / 8 + 1;
-  for (uint32_t i = 0; i < read_array_size; i++) {
-    if (readable_[i] != static_cast<char>(0)) {  // 不能直接与0比较
+  for (uint32_t index = 0; index < static_cast<uint32_t>(BUCKET_ARRAY_SIZE); index++) {
+    if (IsReadable(index)) {
       return false;
     }
   }

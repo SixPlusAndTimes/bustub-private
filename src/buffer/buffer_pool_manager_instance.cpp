@@ -180,7 +180,7 @@ bool BufferPoolManagerInstance::DeletePgImp(page_id_t page_id) {
   frame_id_t frame_id_to_delete = page_table_[page_id];
   Page *page_to_delete = &pages_[frame_id_to_delete];
   if (page_to_delete->pin_count_ != 0) {
-    // some else is using the page
+    // someone else is using the page
     // latch_.unlock();
     return false;
   }
