@@ -222,8 +222,8 @@ bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
 
   // LOG_DEBUG("IncrLocalDepth... and new bucket page, directory view : ");
   // dir_page->PrintDirectory();
-  reinterpret_cast<Page *>(bucket_page)->WLatch();
-  reinterpret_cast<Page *>(image_bucket_page)->WLatch();
+  // reinterpret_cast<Page *>(bucket_page)->WLatch();
+  // reinterpret_cast<Page *>(image_bucket_page)->WLatch();
 
   // LOG_DEBUG("=========================Now Starting Rehashing !========================");
   // rehash所有原bucket中的元素 , 这个过程一定不会overflow
@@ -260,8 +260,8 @@ bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
   //   image_bucket_page->PrintBucket();
   // }
 
-  reinterpret_cast<Page *>(image_bucket_page)->WUnlatch();  // 注意加锁顺序
-  reinterpret_cast<Page *>(bucket_page)->WUnlatch();
+  // reinterpret_cast<Page *>(image_bucket_page)->WUnlatch();  // 注意加锁顺序
+  // reinterpret_cast<Page *>(bucket_page)->WUnlatch();
 
   buffer_pool_manager_->UnpinPage(bucket_page_id, true);
   buffer_pool_manager_->UnpinPage(split_bucket_page_id, true);
@@ -338,7 +338,7 @@ void HASH_TABLE_TYPE::Merge(Transaction *transaction, const KeyType &key, const 
   auto ld_of_image_bucket = dir_page->GetLocalDepth(bucket_image_index);
 
   // for debug
-  LOG_DEBUG("Enter merge :");
+  // LOG_DEBUG("Enter merge :");
   // for debug
 
   HASH_TABLE_BUCKET_TYPE *empty_bucket = FetchBucketPage(bucket_empty_page_id);
@@ -362,11 +362,11 @@ void HASH_TABLE_TYPE::Merge(Transaction *transaction, const KeyType &key, const 
     // for debug
 
     // 删除空余的bucket页
-    reinterpret_cast<Page *>(empty_bucket)->WLatch();
-    LOG_DEBUG("delete page_id %d", bucket_empty_page_id);
+    // reinterpret_cast<Page *>(empty_bucket)->WLatch();
+    // LOG_DEBUG("delete page_id %d", bucket_empty_page_id);
     buffer_pool_manager_->UnpinPage(bucket_empty_page_id, false);
     buffer_pool_manager_->DeletePage(bucket_empty_page_id);
-    reinterpret_cast<Page *>(empty_bucket)->WUnlatch();
+    // reinterpret_cast<Page *>(empty_bucket)->WUnlatch();
 
     auto local_mask = dir_page->GetLocalDepthMask(bucket_empty_index);
     // 设置对应bucket的pageid以及localdepth减1
@@ -384,14 +384,15 @@ void HASH_TABLE_TYPE::Merge(Transaction *transaction, const KeyType &key, const 
       }
     }
     ShrinkDirectory(dir_page);
-  } else {
-    LOG_DEBUG("Didn't merge");
-    LOG_DEBUG(
-        "ld_of_empty_bucket = %d , ld_of_empty_bucket = %d : ld_of_image_bucket %d, bucket_empty_page_id = %d , "
-        "bucket_image_page_id = %d",
-        ld_of_empty_bucket, ld_of_empty_bucket, ld_of_image_bucket, bucket_empty_page_id, bucket_image_page_id);
-    LOG_DEBUG("...");
   }
+  // else {
+  //   LOG_DEBUG("Didn't merge");
+  //   LOG_DEBUG(
+  //       "ld_of_empty_bucket = %d , ld_of_empty_bucket = %d : ld_of_image_bucket %d, bucket_empty_page_id = %d , "
+  //       "bucket_image_page_id = %d",
+  //       ld_of_empty_bucket, ld_of_empty_bucket, ld_of_image_bucket, bucket_empty_page_id, bucket_image_page_id);
+  //   LOG_DEBUG("...");
+  // }
   // debug
   // LOG_DEBUG("after merger directory");
   // dir_page->PrintDirectory();
@@ -405,6 +406,7 @@ void HASH_TABLE_TYPE::Merge(Transaction *transaction, const KeyType &key, const 
   // }
   // LOG_DEBUG("...");
   // debug
+
   // 别忘了unpin这个页面， 本来向写一个标志位判断来者，但是不知道为什么总是 segv ， 还是直接true
   buffer_pool_manager_->UnpinPage(bucket_empty_page_id, true);
 
@@ -449,11 +451,11 @@ bool HASH_TABLE_TYPE::ExtraMerge(Transaction *transaction, const KeyType &key, c
         has_merged = true;
         has_merged_all = true;
         // 删除空余的bucket页
-        reinterpret_cast<Page *>(bucket_to_be_detected)->WLatch();
-        LOG_DEBUG("delete pageid = %d", bucket_to_be_detected_page_id);
+        // reinterpret_cast<Page *>(bucket_to_be_detected)->WLatch();
+        // LOG_DEBUG("delete pageid = %d", bucket_to_be_detected_page_id);
         buffer_pool_manager_->UnpinPage(bucket_to_be_detected_page_id, false);
         buffer_pool_manager_->DeletePage(bucket_to_be_detected_page_id);
-        reinterpret_cast<Page *>(bucket_to_be_detected)->WUnlatch();
+        // reinterpret_cast<Page *>(bucket_to_be_detected)->WUnlatch();
 
         for (uint32_t index = 0; index < dir_page->Size(); index++) {
           auto page_id_tetcting = dir_page->GetBucketPageId(index);
@@ -484,7 +486,7 @@ bool HASH_TABLE_TYPE::ExtraMerge(Transaction *transaction, const KeyType &key, c
   table_latch_.WUnlock();
   return has_merged;
 }
-// 用来debug
+// 用来debug,但是不能在加写锁的方法中使用
 template <typename KeyType, typename ValueType, typename KeyComparator>
 void HASH_TABLE_TYPE::PrintDir() {
   table_latch_.RLock();
