@@ -61,7 +61,9 @@ class ExecutionEngine {
       Tuple tuple;  // 这里已经调用了一次默认构造函数，但是分配的空间在栈上，因此不需要delete之类的操作
       RID rid;
       while (executor->Next(&tuple, &rid)) {
-        if (result_set != nullptr) {
+        // 注意 ： 这里要判断tuple是否真的被分配
+        // insert是不会将tuple赋值的， 所以应该判断元祖是否分配再将它加入结果集中。 insert操作不会改变结果集！
+        if (result_set != nullptr && tuple.IsAllocated()) {
           result_set->push_back(tuple);
         }
       }

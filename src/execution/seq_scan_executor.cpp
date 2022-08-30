@@ -45,7 +45,7 @@ bool SeqScanExecutor::Next(Tuple *tuple, RID *rid) {
     if (predicate_ != nullptr &&
         !predicate_->Evaluate(&(*tableheap_iterator_), &(table_info_->schema_)).GetAs<bool>()) {
       // 不满足predicate
-      tableheap_iterator_++;
+      ++tableheap_iterator_;
       continue;
     }
 
@@ -58,14 +58,15 @@ bool SeqScanExecutor::Next(Tuple *tuple, RID *rid) {
     successed = true;
     // 创建Tuple并将其复制到tuple指向的地址
 
-    // 下面的new 操作会在堆内存中申请空间，但是没有对应的析构函数
-    // tuple = new Tuple(values, output_shema_); // 这一行有两个错误，1是没有析构Tuple ，
-    // 2是没有在给定的地址创建，请见execution.h中的执行代码。 new(tuple)Tuple(values, output_shema_);
-
+    /** 下面的new 操作会在堆内存中申请空间，但是没有对应的析构函数
+     tuple = new Tuple(values, output_shema_); 这一行有两个错误，1是没有析构Tuple
+    ,2是没有在给定的地址创建，请见execution.h中的执行代码。 new(tuple)Tuple(values, output_shema_);
+    这一行也错，错在在堆上分配对象
+    **/
     *tuple = Tuple(values, output_shema_);
 
     *rid = tuple->GetRid();
-    tableheap_iterator_++;
+    ++tableheap_iterator_;
     return successed;
   }
   return successed;
