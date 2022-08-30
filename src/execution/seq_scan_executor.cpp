@@ -55,7 +55,9 @@ bool SeqScanExecutor::Next(Tuple *tuple, RID *rid) {
             values.push_back(value);
         }
         successed = true;
+        // 创建Tuple
         *tuple = Tuple(values,output_shema_);
+        *rid = tuple->GetRid();
         tableheap_iterator_++;
         return successed;
     }
