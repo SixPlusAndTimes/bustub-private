@@ -32,7 +32,7 @@ Tuple *TableIterator::operator->() {
   assert(*this != table_heap_->End());
   return tuple_;
 }
-
+// 前置自增运算符重载
 TableIterator &TableIterator::operator++() {
   BufferPoolManager *buffer_pool_manager = table_heap_->buffer_pool_manager_;
   auto cur_page = static_cast<TablePage *>(buffer_pool_manager->FetchPage(tuple_->rid_.GetPageId()));
@@ -63,7 +63,7 @@ TableIterator &TableIterator::operator++() {
   buffer_pool_manager->UnpinPage(cur_page->GetTablePageId(), false);
   return *this;
 }
-
+// 后置自增运算符重载
 TableIterator TableIterator::operator++(int) {
   TableIterator clone(*this);
   ++(*this);
