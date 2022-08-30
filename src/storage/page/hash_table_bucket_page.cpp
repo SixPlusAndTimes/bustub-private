@@ -166,7 +166,6 @@ bool HASH_TABLE_BUCKET_TYPE::IsFull() {
     return false;
   }
   return true;
-
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>

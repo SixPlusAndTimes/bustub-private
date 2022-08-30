@@ -16,6 +16,7 @@
 
 #include "buffer/buffer_pool_manager.h"
 #include "catalog/catalog.h"
+#include "common/logger.h"
 #include "concurrency/transaction_manager.h"
 #include "execution/executor_context.h"
 #include "execution/executor_factory.h"
@@ -57,7 +58,7 @@ class ExecutionEngine {
 
     // Execute the query plan
     try {
-      Tuple tuple;
+      Tuple tuple;  // 这里已经调用了一次默认构造函数，但是分配的空间在栈上，因此不需要delete之类的操作
       RID rid;
       while (executor->Next(&tuple, &rid)) {
         if (result_set != nullptr) {

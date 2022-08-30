@@ -14,7 +14,9 @@
 
 #include <memory>
 #include <utility>
+#include <vector>
 
+#include "catalog/catalog.h"
 #include "execution/executor_context.h"
 #include "execution/executors/abstract_executor.h"
 #include "execution/plans/insert_plan.h"
@@ -59,6 +61,14 @@ class InsertExecutor : public AbstractExecutor {
  private:
   /** The insert plan node to be executed*/
   const InsertPlanNode *plan_;
+
+  AbstractExecutor *child_executor_;
+
+  bool has_child_executor_ = false;
+
+  TableInfo *table_info_;
+
+  std::vector<std::vector<Value>>::const_iterator raw_values_iterator_;
 };
 
 }  // namespace bustub
