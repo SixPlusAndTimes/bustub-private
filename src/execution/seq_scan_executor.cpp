@@ -12,6 +12,7 @@
 
 #include "execution/executors/seq_scan_executor.h"
 #include <memory>
+#include <ostream>
 #include <vector>
 #include "catalog/catalog.h"
 #include "catalog/column.h"
@@ -38,6 +39,7 @@ void SeqScanExecutor::Init() {
   tableheap_iterator_ = table_info_->table_->Begin(exec_ctx_->GetTransaction());
 }
 
+// 注意 ： NEXT输出的元组并不等于表元组，它是没有RID的； 其RID只能从对应的表元组中得到
 bool SeqScanExecutor::Next(Tuple *tuple, RID *rid) {
   bool successed = false;
   while (tableheap_iterator_ != table_info_->table_->End()) {
@@ -65,10 +67,12 @@ bool SeqScanExecutor::Next(Tuple *tuple, RID *rid) {
     **/
     *tuple = Tuple(values, output_shema_);
 
-    *rid = tuple->GetRid();
+    // *rid = tuple->GetRid();  错误，输出元组是没有RID这个说法的
+    *rid = tableheap_iterator_->GetRid();  // 只能从表元组中得到对应的RID
     ++tableheap_iterator_;
     return successed;
   }
+  // std::cout << "seq_scan succeed, rid pageid = " << rid->GetPageId() << std::endl;
   return successed;
 }
 

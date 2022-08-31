@@ -1,6 +1,9 @@
 #include "catalog/table_generator.h"
 
 #include <algorithm>
+#include <cstring>
+#include <iostream>
+#include <ostream>
 #include <random>
 #include <vector>
 
@@ -65,6 +68,9 @@ void TableGenerator::FillTable(TableInfo *info, TableInsertMeta *table_meta) {
   uint32_t num_inserted = 0;
   uint32_t batch_size = 128;
   while (num_inserted < table_meta->num_rows_) {
+    // if (strcmp(table_meta->name_, "test_1") == 0) {
+    //   std::cout << "test_1 table has rows nums =  " << table_meta->num_rows_ << std::endl;
+    // }
     std::vector<std::vector<Value>> values;
     uint32_t num_values = std::min(batch_size, table_meta->num_rows_ - num_inserted);
     for (auto &col_meta : table_meta->col_meta_) {

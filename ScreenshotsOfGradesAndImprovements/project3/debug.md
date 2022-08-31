@@ -30,3 +30,12 @@
 ~~~
 
 尽量用智能指针管理智能指针，比如 insert_executor.cpp 的初始化方法中，传入的child_executor是智能指针，所以我们也用智能指针管理它，否则会有内存泄漏
+
+# 表元组才有RID
+RID 是一个元组在数据库中的定位信息， RID有page_id 和 slot_num组成，可以通过RID快速定位一个在表中的元组。
+
+务必区分表元组和一般的元组，比如
+~~~cpp
+    *tuple = Tuple(values, output_shema_);
+~~~
+这样创建的元组是没有RID的， 它根本不存在于数据库中。如果执行`tuple->GetRid()`得到的是一个非法的RID。如果不注意，会在delete测试中发生错误
