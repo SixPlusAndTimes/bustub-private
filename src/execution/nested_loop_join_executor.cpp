@@ -31,12 +31,12 @@ NestedLoopJoinExecutor::NestedLoopJoinExecutor(ExecutorContext *exec_ctx, const 
 void NestedLoopJoinExecutor::Init() {
   left_executor_->Init();
   right_executor_->Init();
-  left_table_not_empty_= left_executor_->Next(&left_tuple_, &left_tuple_rid_);
+  left_table_not_empty_ = left_executor_->Next(&left_tuple_, &left_tuple_rid_);
 }
 
 bool NestedLoopJoinExecutor::Next(Tuple *tuple, RID *rid) {
   if (!left_table_not_empty_) {
-    return false; // 左表为空则直接返回
+    return false;  // 左表为空则直接返回
   }
 
   bool join_succeed = false;
@@ -48,15 +48,8 @@ bool NestedLoopJoinExecutor::Next(Tuple *tuple, RID *rid) {
   while (true) {
     bool got_right_tuple = right_executor_->Next(&right_tuple, &right_rid);
     if (!got_right_tuple) {
-      // 右表到底了,初始化右表
-      right_executor_->Init();
-      bool right_table_not_empty =  right_executor_->Next(&right_tuple, &right_rid);
-      if( !right_table_not_empty ) {
-        // 如果初始化之后还是没有得到tuple，说明右表是空的，直接返回false
-        return false;
-      }
-      // right_iter_nums++;
-      // LOG_DEBUG("right_next once ____");
+      // 右表到底了但是需要先判断左表是否到底，左表到底就直接返回，否则右表会多 next一次，IO_Cost测试不会通过
+      
       // 此时需要更新左边元组
       bool got_left_tuple = left_executor_->Next(&left_tuple_, &left_tuple_rid_);
       if (!got_left_tuple) {
@@ -65,6 +58,16 @@ bool NestedLoopJoinExecutor::Next(Tuple *tuple, RID *rid) {
       }
       // LOG_DEBUG("left_next once ____");
       // left_iter_nums++;
+
+      // 右表到底了,初始化右表
+      right_executor_->Init();
+      bool right_table_not_empty = right_executor_->Next(&right_tuple, &right_rid);
+      if (!right_table_not_empty) {
+        // 如果初始化之后还是没有得到tuple，说明右表是空的，直接返回false
+        return false;
+      }
+      // right_iter_nums++;
+      // LOG_DEBUG("right_next once ____");
     }
 
     // right_iter_nums++;
