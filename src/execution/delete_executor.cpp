@@ -40,7 +40,7 @@ bool DeleteExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) {
     if (tuple_deleted) {
       for (auto &index : indexs_info_) {
         Tuple key_tuple =
-        tuple_to_be_delete.KeyFromTuple(table_info_->schema_, index->key_schema_, index->index_->GetKeyAttrs());
+            tuple_to_be_delete.KeyFromTuple(table_info_->schema_, index->key_schema_, index->index_->GetKeyAttrs());
         index->index_->DeleteEntry(key_tuple, rid_to_be_delete, exec_ctx_->GetTransaction());
       }
       delete_successed = true;
