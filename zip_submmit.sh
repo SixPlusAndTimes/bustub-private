@@ -27,4 +27,5 @@ src/execution/nested_loop_join_executor.cpp \
 src/execution/hash_join_executor.cpp \
 src/execution/aggregation_executor.cpp \
 src/execution/limit_executor.cpp \
-src/execution/distinct_executor.cpp
+src/execution/distinct_executor.cpp \
+src/include/storage/page/tmp_tuple_page.h
