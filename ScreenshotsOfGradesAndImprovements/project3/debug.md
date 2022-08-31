@@ -1,4 +1,5 @@
 # InserExecutor不会改变结果集
+(不止insert，还有update等 。。)
 
 所以在execution_engine.h 添加判断tuple是否真的被分配的逻辑
 
@@ -14,7 +15,7 @@
     }
 ~~~
 
-` && tuple.IsAllocated()` 是要增加的
+` && tuple.IsAllocated()` 是要增加的逻辑
 
 # 内存管理
 栈上分配的内存不用管理，因为它们的生存周期是受限的，会被自动释放。而堆上分配的对象必须手动释放或者使用智能指针管理。
@@ -31,11 +32,11 @@
 
 尽量用智能指针管理智能指针，比如 insert_executor.cpp 的初始化方法中，传入的child_executor是智能指针，所以我们也用智能指针管理它，否则会有内存泄漏
 
-# 表元组才有RID
-RID 是一个元组在数据库中的定位信息， RID有page_id 和 slot_num组成，可以通过RID快速定位一个在表中的元组。
+# 只有表元组才有RID
+RID 是一个元组在数据库中的定位信息， RID由page_id 和 slot_num组成，可以通过RID快速定位一个在表中的元组。
 
 务必区分表元组和一般的元组，比如
 ~~~cpp
     *tuple = Tuple(values, output_shema_);
 ~~~
-这样创建的元组是没有RID的， 它根本不存在于数据库中。如果执行`tuple->GetRid()`得到的是一个非法的RID。如果不注意，会在delete测试中发生错误
+这样创建的元组是没有RID的， 它根本不存在于数据库中，也就没有定位信息。这之后执行的`tuple->GetRid()`得到的是一个非法的RID。如果不注意，会在delete测试中发生错误

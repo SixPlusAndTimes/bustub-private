@@ -9,7 +9,7 @@
 
 project1 我是大概写了以下 split 的逻辑后进行了第一次提交， 果不其然的是超时。。。
 
-我把锁去掉了，但还是超时。没有办法，我把extendible_hash_table重置成“出场状态”，先测试前一个Task1， 但是buid error了，修改几次后，发现还是代码风格问题
+我把锁去掉了，但还是超时。没有办法，我把extendible_hash_table重置成“出厂状态”，先测试前一个Task1， 但是buid error了，修改几次后，发现还是代码风格问题
 
 。。。真的很玄学阿， 感觉在代码风格上浪费了太多时间了
 
@@ -48,7 +48,7 @@ bool HASH_TABLE_BUCKET_TYPE::Insert(KeyType key, ValueType value, KeyComparator 
 
 这个BUG也改了很久,不下20次提交
 
-# 一小部分以下部分地去完成和测试
+# 一小部分一下部分地去完成和测试
 本地的测试完成一个就提交一次， 否则最后一次性提交可能会很难再排查出问题。
 
 两个本地测试其实不用加锁也可以通过，所以可以先把功能实现完成，去gradescope上检测以下(应该能拿30分)，然后再去实现线程安全
@@ -89,6 +89,7 @@ bool HASH_TABLE_BUCKET_TYPE::Insert(KeyType key, ValueType value, KeyComparator 
 好像有很多要总结的，之后再详细做个笔记吧。
 
 体感project2的难度 与project1的难度 差了一个数量级， 对一个非科班学生来说，第一次正经的CS LAB尝试真的太困难了。DEBUG是一件非常痛苦的事，但是看着gradescope的满分时，还是有满满的成就感。
+
 ![img](./project2_fullmarks.png)
 
 ![img](./project2_leadbord.png)
