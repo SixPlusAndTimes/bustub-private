@@ -40,3 +40,64 @@ RID 是一个元组在数据库中的定位信息， RID由page_id 和 slot_num�
     *tuple = Tuple(values, output_shema_);
 ~~~
 这样创建的元组是没有RID的， 它根本不存在于数据库中，也就没有定位信息。这之后执行的`tuple->GetRid()`得到的是一个非法的RID。如果不注意，会在delete测试中发生错误
+
+# nested_loop_join
+课堂上讲的连接算法是非常简单的：
+
+![img](nest_loop_join_algorithm.png)
+
+再一次体会到了理论与实践的差距。它`没有把火山模型考虑`进去： 每一个executor都是调用next来实现的，如果找到一个匹配的元组，那么就要提前return。
+
+但是下一次executor.next时不应该对左表进行迭代，先应该判断右表是否到底，如果右表到底了那么左表迭代一次，并初始化右表。
+
+可能需要在类的成员函数中保存左表的元组 以便NEXT的逻辑无误
+
+注意空表的处理
+
+注意grade_scope线上测试有`IO_cost` 测试，会判断你对两个表的迭代次数是否有误。比如A表10条记录，B表10条记录，那么总共的“IO次数”(应该是算的对两张表调用next总次数) = 10 * 10 = 100。所以也要注意这里的逻辑，我之前写的逻辑迭代了101次，没有通过，下面是通过的代码片段。
+
+~~~cpp
+// left_tuple_是类的成员变量保存左表next出来的tuple， 而right_tuple只是在本方法中创建的一个在栈上的临时变量
+while (true) {
+    bool got_right_tuple = right_executor_->Next(&right_tuple, &right_rid);
+    if (!got_right_tuple) {
+      // !!!!!右表到底了但是需要先判断左表是否到底，左表到底就直接返回，否则右表会多 next 1次，IO_Cost测试不会通过!!!!!
+      
+      // 此时需要 先 更新左边元组
+      bool got_left_tuple = left_executor_->Next(&left_tuple_, &left_tuple_rid_);
+      if (!got_left_tuple) {
+        // 说明左表到底了,连接结束
+        return false;
+      }
+
+      // 右表到底了,初始化右表。再更新右元组
+      right_executor_->Init();
+      bool right_table_not_empty = right_executor_->Next(&right_tuple, &right_rid);
+      if (!right_table_not_empty) {
+        // 如果初始化之后还是没有得到tuple，说明右表是空的，直接返回false
+        return false;
+      }
+    }
+    // 判断连接条件
+    if (plan_->Predicate() == nullptr || plan_->Predicate()
+                                             ->EvaluateJoin(&left_tuple_, left_executor_->GetOutputSchema(),
+                                                            &right_tuple, right_executor_->GetOutputSchema())
+                                             .GetAs<bool>()) {
+      std::vector<Value> values;
+      auto output_shema = plan_->OutputSchema();
+      values.reserve(output_shema->GetColumnCount());
+      // 根据两个表的schema构造连接后元组的各个value
+      for (uint32_t i = 0; i < output_shema->GetColumnCount(); i++) {
+        Value value = output_shema->GetColumn(i).GetExpr()->EvaluateJoin(
+            &left_tuple_, left_executor_->GetOutputSchema(), &right_tuple, right_executor_->GetOutputSchema());
+        values.push_back(value);
+      }
+      // 构造一个连接成功的元组
+      *tuple = Tuple(values, output_shema);
+      *rid = left_tuple_.GetRid();  // 左表的rid
+      return true;
+    }
+  }
+
+
+~~~
