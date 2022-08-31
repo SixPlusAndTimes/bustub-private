@@ -12,6 +12,7 @@
 
 #include <unordered_set>
 
+#include "common/logger.h"
 #include "execution/executors/nested_loop_join_executor.h"
 #include "execution/plans/mock_scan_plan.h"
 #include "executor_test_util.h"  // NOLINT
@@ -267,7 +268,9 @@ TEST_F(GradingExecutorTest, NestedLoopJoinOuterTableDuplicateJoinKeys) {
   }
 
   std::vector<Tuple> result_set{};
+  // LOG_DEBUG("...NestedLoopJoinOuterTableDuplicateJoinKeysExecuteing ..... ");
   GetExecutionEngine()->Execute(join_plan.get(), &result_set, GetTxn(), GetExecutorContext());
+  // LOG_DEBUG("...NestedLoopJoinOuterTableDuplicateJoinKeysExecuted ..... ");
 
   // Table 7 contains 100 tuples, partitioned into 10 groups of
   // 10 that share a join key (colC); Table 8 contains 10 tuples,
@@ -330,7 +333,9 @@ TEST_F(GradingExecutorTest, NestedLoopJoinInnerTableDuplicateJoinKeys) {
   }
 
   std::vector<Tuple> result_set{};
+  LOG_DEBUG("...NestedLoopJoinInnerTableDuplicateJoinKeysExecuteing ..... ");
   GetExecutionEngine()->Execute(join_plan.get(), &result_set, GetTxn(), GetExecutorContext());
+  LOG_DEBUG("...NestedLoopJoinInnerTableDuplicateJoinKeysExecuteing ..... ");
 
   // Table 7 contains 100 tuples, partitioned into 10 groups of
   // 10 that share a join key (colC); Table 8 contains 10 tuples,

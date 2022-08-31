@@ -56,7 +56,7 @@ class SeqScanExecutor : public AbstractExecutor {
   /** The sequential scan plan node to be executed */
   const SeqScanPlanNode *plan_;
 
-  const AbstractExpression *predicate_;
+  // const AbstractExpression *predicate_;
 
   TableIterator tableheap_iterator_;
 

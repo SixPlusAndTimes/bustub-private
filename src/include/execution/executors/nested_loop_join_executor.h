@@ -15,6 +15,7 @@
 #include <memory>
 #include <utility>
 
+#include "common/rid.h"
 #include "execution/executor_context.h"
 #include "execution/executors/abstract_executor.h"
 #include "execution/plans/nested_loop_join_plan.h"
@@ -55,6 +56,14 @@ class NestedLoopJoinExecutor : public AbstractExecutor {
  private:
   /** The NestedLoopJoin plan node to be executed. */
   const NestedLoopJoinPlanNode *plan_;
+
+  std::unique_ptr<AbstractExecutor> left_executor_;
+  std::unique_ptr<AbstractExecutor> right_executor_;
+
+  Tuple left_tuple_;
+  RID left_tuple_rid_;
+
+  bool left_table_not_empty_;
 };
 
 }  // namespace bustub

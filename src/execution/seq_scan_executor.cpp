@@ -28,7 +28,6 @@ namespace bustub {
 SeqScanExecutor::SeqScanExecutor(ExecutorContext *exec_ctx, const SeqScanPlanNode *plan)
     : AbstractExecutor(exec_ctx),
       plan_(plan),
-      predicate_(plan_->GetPredicate()),
       tableheap_iterator_(nullptr, RID(INVALID_PAGE_ID, 0), nullptr),
       output_shema_(plan_->OutputSchema()) {}
 
@@ -44,8 +43,8 @@ bool SeqScanExecutor::Next(Tuple *tuple, RID *rid) {
   bool successed = false;
   while (tableheap_iterator_ != table_info_->table_->End()) {
     // &(*tableheap_iterator_) : 对迭代器解引用得到 Tuple& , 再对Tuple取地址得到 Tuple *
-    if (predicate_ != nullptr &&
-        !predicate_->Evaluate(&(*tableheap_iterator_), &(table_info_->schema_)).GetAs<bool>()) {
+    auto predicate = plan_->GetPredicate();
+    if (predicate != nullptr && !predicate->Evaluate(&(*tableheap_iterator_), &(table_info_->schema_)).GetAs<bool>()) {
       // 不满足predicate
       ++tableheap_iterator_;
       continue;
@@ -54,7 +53,8 @@ bool SeqScanExecutor::Next(Tuple *tuple, RID *rid) {
     std::vector<Value> values;
     values.reserve(output_shema_->GetColumnCount());
     for (uint32_t i = 0; i < output_shema_->GetColumnCount(); i++) {
-      Value value = output_shema_->GetColumn(i).GetExpr()->Evaluate(&(*tableheap_iterator_), output_shema_);
+      // 注意 ： 这里的Evaluate方法输入的schema参数是锁扫描表的shema，而不是outputschema，否则会访问非法内存！
+      Value value = output_shema_->GetColumn(i).GetExpr()->Evaluate(&(*tableheap_iterator_), &table_info_->schema_);
       values.push_back(value);
     }
     successed = true;
@@ -72,7 +72,6 @@ bool SeqScanExecutor::Next(Tuple *tuple, RID *rid) {
     ++tableheap_iterator_;
     return successed;
   }
-  // std::cout << "seq_scan succeed, rid pageid = " << rid->GetPageId() << std::endl;
   return successed;
 }
 
