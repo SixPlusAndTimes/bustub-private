@@ -204,13 +204,17 @@ class AggregationExecutor : public AbstractExecutor {
   }
 
  private:
+  // help function
+  void TupleSchemaTranformUseEvaluateAggregate(const std::vector<Value> &group_bys,
+                                               const std::vector<Value> &aggregates, Tuple *dest_tuple,
+                                               const Schema *dest_schema);
   /** The aggregation plan node */
   const AggregationPlanNode *plan_;
   /** The child executor that produces tuples over which the aggregation is computed */
   std::unique_ptr<AbstractExecutor> child_;
   /** Simple aggregation hash table */
-  // TODO(Student): Uncomment SimpleAggregationHashTable aht_;
+  SimpleAggregationHashTable aht_;
   /** Simple aggregation hash table iterator */
-  // TODO(Student): Uncomment SimpleAggregationHashTable::Iterator aht_iterator_;
+  SimpleAggregationHashTable::Iterator aht_iterator_;
 };
 }  // namespace bustub
