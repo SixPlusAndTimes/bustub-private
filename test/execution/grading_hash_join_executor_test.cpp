@@ -12,6 +12,7 @@
 
 #include <unordered_set>
 
+#include "common/logger.h"
 #include "execution/executors/hash_join_executor.h"
 #include "execution/plans/mock_scan_plan.h"
 #include "executor_test_util.h"  // NOLINT
@@ -264,8 +265,9 @@ TEST_F(GradingExecutorTest, HashJoinOuterTableDuplicateJoinKeys) {
   }
 
   std::vector<Tuple> result_set{};
+  LOG_DEBUG("...outer join duplicate executing...");
   GetExecutionEngine()->Execute(join_plan.get(), &result_set, GetTxn(), GetExecutorContext());
-
+  LOG_DEBUG("...outer join duplicate executed ...");
   // Table 7 contains 100 tuples, partitioned into 10 groups of
   // 10 that share a join key (colC); Table 8 contains 10 tuples,
   // with values for colB from 0 .. 9; for each outer tuple, we

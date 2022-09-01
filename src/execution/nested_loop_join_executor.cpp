@@ -49,7 +49,7 @@ bool NestedLoopJoinExecutor::Next(Tuple *tuple, RID *rid) {
     bool got_right_tuple = right_executor_->Next(&right_tuple, &right_rid);
     if (!got_right_tuple) {
       // 右表到底了但是需要先判断左表是否到底，左表到底就直接返回，否则右表会多 next一次，IO_Cost测试不会通过
-      
+
       // 此时需要更新左边元组
       bool got_left_tuple = left_executor_->Next(&left_tuple_, &left_tuple_rid_);
       if (!got_left_tuple) {
