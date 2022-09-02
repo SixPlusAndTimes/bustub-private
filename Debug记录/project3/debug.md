@@ -41,6 +41,9 @@ RID 是一个元组在数据库中的定位信息， RID由page_id 和 slot_num�
 ~~~
 这样创建的元组是没有RID的， 它根本不存在于数据库中，也就没有定位信息。这之后执行的`tuple->GetRid()`得到的是一个非法的RID。如果不注意，会在delete测试中发生错误
 
+# 构造元组
+使用某个expression构造元组时，一定要传入相应的schema，否则很容易产生越界错误 
+
 # nested_loop_join
 课堂上讲的连接算法是非常简单的：
 
@@ -54,7 +57,7 @@ RID 是一个元组在数据库中的定位信息， RID由page_id 和 slot_num�
 
 注意空表的处理
 
-注意grade_scope线上测试有`IO_cost` 测试，会判断你对两个表的迭代次数是否有误。比如A表10条记录，B表10条记录，那么总共的“IO次数”(应该是算的对两张表调用next总次数) = 10 * 10 = 100。所以也要注意这里的逻辑，我之前写的逻辑迭代了101次，没有通过，下面是通过的代码片段。
+注意grade_scope线上测试有`IO_cost` 测试，会判断你对两个表的迭代次数是否有误。比如A表10条记录，B表10条记录，那么总共的“IO次数”(应该是算的对两张表调用next总次数) = 10 * 10 = 100。所以也要注意这里的逻辑，我之前写的逻辑迭代了101次（就多了一次），没有通过，下面是通过的代码片段。
 
 ~~~cpp
 // left_tuple_是类的成员变量保存左表next出来的tuple， 而right_tuple只是在本方法中创建的一个在栈上的临时变量
@@ -98,6 +101,27 @@ while (true) {
       return true;
     }
   }
-
-
 ~~~
+
+# C++引用
+不像Java几乎所有的class objet都是以引用出现， C++想获得一个object引用必须显示申明它，否则会发生拷贝而出错
+
+~~~cpp
+      // 注意这里必须是std::vector<Tuple>&，必须取引用而不是复制，否则 在处理重复key时会出错！
+      // std::vector<Tuple> tuple_vector = join_map_[left_join_key];  这样就是复制了一个vector
+      std::vector<Tuple> &tuple_vector = join_map_[left_join_key];
+      tuple_vector.push_back(left_tuple);
+~~~
+
+# 总结
+难度在源码阅读理解上，许多方法都是有用的，但是官网就是不告诉你，让你自己看和理解。
+
+看了别人的博客记录我才意识到如何使用已给出的方法得到想要的结果，尤其是 aggregate 那一个执行器， 真的不知道怎么搞， 实现逻辑比 nest_loop_join 和 hash_join都要简单。但就是有些方法看不懂。
+
+感觉难度确实比project2小，但还是做了4天左右(当然借鉴了别人的想法)，代码量似乎比project2多一些(grade_scope的project3总分360分)
+
+通过截图 :
+![img](project3_fullgrade.png)
+
+![img](project3leadboard.png)
+
