@@ -47,7 +47,10 @@ class LockManager {
    public:
     std::list<LockRequest> request_queue_;
     std::condition_variable cv_;  // for notifying blocked transactions on this rid
-    bool upgrading_ = false;
+    bool upgrading_ = false;      // 是否正在升级， while循环等待写锁释放时，upgrading为true，
+                                  // 推出whilie循环后，将读锁升级并将ubgrading设置为false；
+    bool has_writer_ = false;     // 标记这个等待队列中是否有读锁
+    int sharing_count_ = 0;       // 获得 share lock 的事物个数
   };
 
  public:
@@ -129,7 +132,13 @@ class LockManager {
   /** Runs cycle detection in the background. */
   void RunCycleDetection();
 
+  // 自定义函数
+
+  // 2PL检测函数
+  bool TwoPhaseLockingDetect();
+
  private:
+  // 这个mutex用来保护 LoclRequestQueue
   std::mutex latch_;
   std::atomic<bool> enable_cycle_detection_;
   std::thread *cycle_detection_thread_;

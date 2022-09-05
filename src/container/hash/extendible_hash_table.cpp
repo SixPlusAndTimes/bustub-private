@@ -98,22 +98,11 @@ bool HASH_TABLE_TYPE::GetValue(Transaction *transaction, const KeyType &key, std
   HashTableDirectoryPage *dir_page = FetchDirectoryPage();
   page_id_t bucket_page_id = KeyToPageId(key, dir_page);
   HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(bucket_page_id);
-
-  /* for debug*/
-  // if (dir_page->GetGlobalDepth() == 1) {
-  //   std::cout << "search key = " << key << std::endl;
-  // }
-  /* for debug*/
-
+  // dynamic_cast<Page*>(bucket_page);
   reinterpret_cast<Page *>(bucket_page)->RLatch();
   bool ret = bucket_page->GetValue(key, comparator_, result);  // 读取桶页内容前加页的读锁
   reinterpret_cast<Page *>(bucket_page)->RUnlatch();
 
-  /* for debug*/
-  // if (!ret && dir_page->GetGlobalDepth() >= 1) {
-  //   std::cout << "search failed!, search key = " << key << std::endl;
-  // }
-  /* for debug*/
   buffer_pool_manager_->UnpinPage(bucket_page_id, false);
   buffer_pool_manager_->UnpinPage(directory_page_id_, false);
   table_latch_.RUnlock();
@@ -129,13 +118,7 @@ bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const
   HashTableDirectoryPage *dir_page = FetchDirectoryPage();
   page_id_t bucket_page_id = KeyToPageId(key, dir_page);
   HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(bucket_page_id);
-
-  // for debug
-  // if (value == static_cast<ValueType>(252)) {
-  //   std::cout << "key =  " << key << " value = " << value << std::endl;
-  //   std::cout << "hash to page " << bucket_page_id << std::endl;
-  //   // for debug
-  // }
+  // dynamic_cast<Page *>(bucket_page); 不能用dynamic_cast, 因为Page没有虚函数
   reinterpret_cast<Page *>(bucket_page)->WLatch();
   bool insert_successed = bucket_page->Insert(key, value, comparator_);
   reinterpret_cast<Page *>(bucket_page)->WUnlatch();
@@ -166,7 +149,6 @@ bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
   if (!bucket_page->IsFull()) {
     // 如果bucket_page没有满，则不用再分裂了， 相当于递归的中终止条件
     // LOG_DEBUG("NO Need to split");
-    // std::cout << "last key : " << key << " hash to pageid = " << bucket_page_id << std::endl;
     bool ret = bucket_page->Insert(key, value, comparator_);
     buffer_pool_manager_->UnpinPage(bucket_page_id, true);
     buffer_pool_manager_->UnpinPage(directory_page_id_, true);
