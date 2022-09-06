@@ -551,9 +551,9 @@ const size_t NUM_ITERS = 10;
  * die when it's waiting for previous txn is also waiting
  */
 TEST(LockManagerTest, WoundWaitTest) {
-  // for (size_t i = 0; i < NUM_ITERS; i++) {
+  for (size_t i = 0; i < NUM_ITERS; i++) {
     WoundWaitBasicTest();
-  // }
+  }
 }
 
 /*
@@ -562,7 +562,7 @@ TEST(LockManagerTest, WoundWaitTest) {
  * The main point for this test is to ensure no deadlock
  * happen (test won't hang).
  */
-TEST(LockManagerTest, DISABLED_WoundWaitDeadlockTest) {
+TEST(LockManagerTest, WoundWaitDeadlockTest) {
   for (size_t i = 0; i < NUM_ITERS; i++) {
     WoundWaitDeadlockTest();
   }
@@ -580,9 +580,9 @@ TEST(LockManagerTest, DISABLED_WoundWaitDeadlockTest) {
  *    if the queue has transactions with smaller tid.
  */
 TEST(LockManagerTest,DISABLED_WoundUpgradeTest) {
-  for (size_t i = 0; i < NUM_ITERS; i++) {
+  // for (size_t i = 0; i < NUM_ITERS; i++) {
     WoundUpgradeTest();
-  }
+  // }
 }
 
 /*

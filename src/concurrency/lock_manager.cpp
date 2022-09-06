@@ -79,6 +79,9 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
     // 等待这个RID的请求队列中没有写锁
     while (request_queue.has_writer_ || txn->GetState() == TransactionState::ABORTED) {
       request_queue.cv_.wait(uniq_lk);
+      if (txn->GetState() != TransactionState::ABORTED && !request_queue.has_writer_) {
+        break;
+      } 
     }
 
     // 遍历request_list , 将先前加入的request 的granted字段改称true；
@@ -142,6 +145,9 @@ bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
     while ((request_queue.sharing_count_ > 0 && request_queue.has_writer_) || txn->GetState() != TransactionState::ABORTED) {
       LOG_DEBUG("txn id = %d waitin ", txn->GetTransactionId());
       request_queue.cv_.wait(uniq_lk);
+      if (txn->GetState() != TransactionState::ABORTED && (request_queue.sharing_count_ == 0 && !request_queue.has_writer_)) {
+        break;
+      }
     }
 
     std::list<LockRequest>::iterator itetator_list;
