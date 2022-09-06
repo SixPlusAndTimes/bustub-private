@@ -184,14 +184,14 @@ void WoundWaitBasicTest() {
     // unlock
     txn_mgr.Abort(&txn_die);
   };
-
+  // 主线程运行老事务
   Transaction txn_hold(id_hold);
   txn_mgr.Begin(&txn_hold);
 
   // launch the waiter thread
   std::thread wait_thread{wait_die_task};
 
-  // wait for txn1 to lock
+  // wait for txn1 to lock， 应该是在wait_thread执行setvalue后，唤醒
   t1_future.wait();
 
   bool res = lock_mgr.LockExclusive(&txn_hold, rid);
@@ -203,6 +203,6 @@ void WoundWaitBasicTest() {
   txn_mgr.Commit(&txn_hold);
   CheckCommitted(&txn_hold);
 }
-TEST(LockManagerTest, DISABLED_WoundWaitBasicTest) { WoundWaitBasicTest(); }
+TEST(LockManagerTest, WoundWaitBasicTest) { WoundWaitBasicTest(); }
 
 }  // namespace bustub

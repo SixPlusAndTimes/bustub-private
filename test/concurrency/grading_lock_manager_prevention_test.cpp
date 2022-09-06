@@ -558,7 +558,7 @@ TEST(LockManagerTest, WoundWaitTest) {
  * The main point for this test is to ensure no deadlock
  * happen (test won't hang).
  */
-TEST(LockManagerTest, WoundWaitDeadlockTest) {
+TEST(LockManagerTest, DISABLED_WoundWaitDeadlockTest) {
   for (size_t i = 0; i < NUM_ITERS; i++) {
     WoundWaitDeadlockTest();
   }
@@ -575,7 +575,7 @@ TEST(LockManagerTest, WoundWaitDeadlockTest) {
  *    Test 3 also tests if later txn won't be added into the wait queue
  *    if the queue has transactions with smaller tid.
  */
-TEST(LockManagerTest, WoundUpgradeTest) {
+TEST(LockManagerTest,DISABLED_WoundUpgradeTest) {
   for (size_t i = 0; i < NUM_ITERS; i++) {
     WoundUpgradeTest();
   }
@@ -587,7 +587,7 @@ TEST(LockManagerTest, WoundUpgradeTest) {
  * 1) Queue is fair for incoming read requests
  * 2) Queue is fair for incoming read and write requests
  */
-TEST(LockManagerTest, WoundWaitFairnessTest) {
+TEST(LockManagerTest, DISABLED_WoundWaitFairnessTest) {
   for (size_t i = 0; i < NUM_ITERS; i++) {
     FairnessTest1();
     FairnessTest2();

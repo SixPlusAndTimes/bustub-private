@@ -43,9 +43,10 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
     txn->SetState(TransactionState::ABORTED);
     return false;
   }
-  // std::condition_variable 必须配合std::unique_lock来使用
-  // 使用 unique_lock 加锁，不需要在return前解说，而且
+
+  // 使用 unique_lock 加锁，不需要在return前解说，而且std::condition_variable 必须配合std::unique_lock来使用
   std::unique_lock<std::mutex> uniq_lk(latch_);
+  txnid_to_txnptr_map_.emplace(txn->GetTransactionId(), txn);
 
   LockRequest new_request(txn->GetTransactionId(), LockMode::SHARED);
 
@@ -65,6 +66,7 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
     while (request_queue.has_writer_) {
       request_queue.cv_.wait(uniq_lk);
     }
+    
     // 遍历request_list , 将先前加入的request 的granted字段改称true；
     std::list<LockRequest>::iterator itetator_list;
     for (itetator_list = request_queue.request_queue_.begin(); itetator_list != request_queue.request_queue_.end();
@@ -91,6 +93,8 @@ bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
 
   std::unique_lock<std::mutex> uniq_lk(latch_);
 
+  txnid_to_txnptr_map_.emplace(txn->GetTransactionId(), txn);
+
   LockRequest new_request(txn->GetTransactionId(), LockMode::EXCLUSIVE);
 
   if (lock_table_.count(rid) == 0) {
@@ -99,8 +103,22 @@ bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
     lock_table_[rid].has_writer_ = true;
   } else {
     LockRequestQueue &request_queue = lock_table_[rid];
-    request_queue.request_queue_.push_back(new_request);
-    // 等待队列中没有读锁（这样似乎读者会饿死写者）
+    // wound wait算法 预防死锁
+    for (auto &request : request_queue.request_queue_) {
+      if (request.txn_id_ > txn->GetTransactionId()) {
+        // 新事务abort
+        if (request.lock_mode_ == LockMode::SHARED) {
+          request_queue.sharing_count_--;
+        } else {
+          request_queue.has_writer_ = false;
+        }
+        request.granted_ = false;
+        txnid_to_txnptr_map_[request.txn_id_]->SetState(TransactionState::ABORTED);
+      }
+    }
+
+    request_queue.request_queue_.push_back(new_request);  // 先将请求加入队列
+    // 等待队列中没有（老事务的）读锁（这样似乎读者会饿死写者？）
     while (request_queue.sharing_count_ > 0 && request_queue.has_writer_) {
       request_queue.cv_.wait(uniq_lk);
     }
