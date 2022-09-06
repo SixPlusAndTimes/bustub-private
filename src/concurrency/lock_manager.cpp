@@ -277,7 +277,10 @@ bool LockManager::Unlock(Transaction *txn, const RID &rid) {
     }
   }
   auto lock_mode = (*itetator_list).lock_mode_;  // 获取lockmode后在list中删除这个LcokRequest
-  request_queue.request_queue_.erase(itetator_list);
+  if (itetator_list != request_queue.request_queue_.end()) {
+    request_queue.request_queue_.erase(itetator_list);
+  }
+  
 
   if (lock_mode == LockMode::SHARED) {
     request_queue.sharing_count_--;

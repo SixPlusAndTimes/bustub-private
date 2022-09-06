@@ -41,7 +41,7 @@ class LockManager {
 
     txn_id_t txn_id_;
     LockMode lock_mode_;
-    bool granted_ = false;
+    bool granted_;
   };
 
   class LockRequestQueue {
