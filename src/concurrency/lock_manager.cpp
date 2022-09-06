@@ -68,7 +68,6 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
       if (request.txn_id_ > txn->GetTransactionId() && request.lock_mode_ == LockMode::EXCLUSIVE) {
         // 新事务abort
         request_queue.has_writer_ = false;
-
         request.granted_ = false;
         txnid_to_txnptr_map_[request.txn_id_]->SetState(TransactionState::ABORTED);
         // LOG_DEBUG("txn id = %d abored by txn id = %d", request.txn_id_, txn->GetTransactionId());
@@ -94,7 +93,7 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
         break;
       }
     }
-    // 在等待过程中可能被杀死
+    // 在等待过程中可能被abort
     if (txn->GetState() == TransactionState::ABORTED) {
       request_queue.request_queue_.erase(itetator_list);
       return false;
@@ -135,11 +134,6 @@ bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
       // txn->GetTransactionId(),request.txn_id_);
       if (request.txn_id_ > txn->GetTransactionId()) {
         // 新事务abort
-        // if (request.lock_mode_ == LockMode::SHARED) {
-        //   request_queue.sharing_count_--;
-        // } else {
-        //   request_queue.has_writer_ = false;
-        // }
         request.granted_ = false;
         txnid_to_txnptr_map_[request.txn_id_]->SetState(TransactionState::ABORTED);
         // LOG_DEBUG("txn id = %d  kill txn = %d", txn->GetTransactionId(), request.txn_id_);
@@ -159,6 +153,7 @@ bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
     // 等待队列中没有（老事务的）读锁（这样似乎读者会饿死写者？）, 或者被 aborte
     while ((request_queue.sharing_count_ > 0 && request_queue.has_writer_) ||
            txn->GetState() != TransactionState::ABORTED) {
+      // 下面的if条件是判断自己是否被abort了，如果是就推出循环
       if (txn->GetState() != TransactionState::ABORTED &&
           (request_queue.sharing_count_ == 0 && !request_queue.has_writer_)) {
         break;
@@ -235,6 +230,7 @@ bool LockManager::LockUpgrade(Transaction *txn, const RID &rid) {
   while ((request_queue.has_writer_ && request_queue.sharing_count_ > 0) ||
          txn->GetState() != TransactionState::ABORTED) {
     // LOG_DEBUG("txn id =%d upgrading waiting ", txn->GetTransactionId());
+    // 下面的if条件是判断自己是否被abort了，如果是就推出循环
     if (txn->GetState() != TransactionState::ABORTED &&
         (request_queue.sharing_count_ == 0 && !request_queue.has_writer_)) {
       break;
