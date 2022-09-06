@@ -17,9 +17,9 @@
 #include <tuple>
 #include <utility>
 #include <vector>
+#include "common/logger.h"
 #include "concurrency/transaction.h"
 #include "storage/table/tuple.h"
-#include "common/logger.h"
 
 namespace bustub {
 // 注意： 普通2PL只能解决不可重复读的问题，不能解决脏读问题； 严格而阶段锁能够解决脏读问题
@@ -67,14 +67,13 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
     for (auto &request : request_queue.request_queue_) {
       if (request.txn_id_ > txn->GetTransactionId() && request.lock_mode_ == LockMode::EXCLUSIVE) {
         // 新事务abort
-          request_queue.has_writer_ = false;
-          
+        request_queue.has_writer_ = false;
+
         request.granted_ = false;
         txnid_to_txnptr_map_[request.txn_id_]->SetState(TransactionState::ABORTED);
-        LOG_DEBUG("txn id = %d abored by txn id = %d", request.txn_id_, txn->GetTransactionId());
+        // LOG_DEBUG("txn id = %d abored by txn id = %d", request.txn_id_, txn->GetTransactionId());
         request_queue.cv_.notify_all();
       }
-      
     }
     request_queue.request_queue_.push_back(new_request);
     // 等待这个RID的请求队列中没有写锁
@@ -82,8 +81,8 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
       // 如果 被abort 或者 并发条件满足则break
       if (txn->GetState() != TransactionState::ABORTED && !request_queue.has_writer_) {
         break;
-      } 
-      LOG_DEBUG("txnid = %d sharelock waiting",txn->GetTransactionId());
+      }
+      // LOG_DEBUG("txnid = %d sharelock waiting",txn->GetTransactionId());
       request_queue.cv_.wait(uniq_lk);
     }
 
@@ -95,7 +94,7 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
         break;
       }
     }
-        // 在等待过程中可能被杀死
+    // 在等待过程中可能被杀死
     if (txn->GetState() == TransactionState::ABORTED) {
       request_queue.request_queue_.erase(itetator_list);
       return false;
@@ -129,31 +128,43 @@ bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
   } else {
     LockRequestQueue &request_queue = lock_table_[rid];
     // wound wait算法 预防死锁
+    int sharing_count = 0;
+    bool has_wrtiter = false;
     for (auto &request : request_queue.request_queue_) {
+      // LOG_DEBUG("exclusive lock wound wait prevnetion, detector txn id = %d, detected txn id = %d",
+      // txn->GetTransactionId(),request.txn_id_);
       if (request.txn_id_ > txn->GetTransactionId()) {
         // 新事务abort
-        if (request.lock_mode_ == LockMode::SHARED) {
-          request_queue.sharing_count_--;
-        } else {
-          request_queue.has_writer_ = false;
-        }
+        // if (request.lock_mode_ == LockMode::SHARED) {
+        //   request_queue.sharing_count_--;
+        // } else {
+        //   request_queue.has_writer_ = false;
+        // }
         request.granted_ = false;
         txnid_to_txnptr_map_[request.txn_id_]->SetState(TransactionState::ABORTED);
-        LOG_DEBUG("txn id = %d  kill txn = %d", txn->GetTransactionId(), request.txn_id_);
+        // LOG_DEBUG("txn id = %d  kill txn = %d", txn->GetTransactionId(), request.txn_id_);
         request_queue.cv_.notify_all();
+      } else {
+        if (request.lock_mode_ == LockMode::SHARED) {
+          sharing_count++;
+        } else {
+          has_wrtiter = true;
+        }
       }
-      
     }
+    request_queue.has_writer_ = has_wrtiter;
+    request_queue.sharing_count_ = sharing_count;
 
     request_queue.request_queue_.push_back(new_request);  // 先将请求加入队列
     // 等待队列中没有（老事务的）读锁（这样似乎读者会饿死写者？）, 或者被 aborte
-    while ((request_queue.sharing_count_ > 0 && request_queue.has_writer_) || txn->GetState() != TransactionState::ABORTED) {    
-      if (txn->GetState() != TransactionState::ABORTED && (request_queue.sharing_count_ == 0 && !request_queue.has_writer_)) {
+    while ((request_queue.sharing_count_ > 0 && request_queue.has_writer_) ||
+           txn->GetState() != TransactionState::ABORTED) {
+      if (txn->GetState() != TransactionState::ABORTED &&
+          (request_queue.sharing_count_ == 0 && !request_queue.has_writer_)) {
         break;
       }
-      LOG_DEBUG("txn id = %d waitin ", txn->GetTransactionId());
+      // LOG_DEBUG("txn id = %d waitin ", txn->GetTransactionId());
       request_queue.cv_.wait(uniq_lk);
-
     }
 
     std::list<LockRequest>::iterator itetator_list;
@@ -168,7 +179,7 @@ bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
       request_queue.request_queue_.erase(itetator_list);
       return false;
     }
-    LOG_DEBUG("txn id = %d, get lock", txn->GetTransactionId());
+    // LOG_DEBUG("txn id = %d, get lock", txn->GetTransactionId());
     (*itetator_list).granted_ = true;
     request_queue.has_writer_ = true;
   }
@@ -221,16 +232,18 @@ bool LockManager::LockUpgrade(Transaction *txn, const RID &rid) {
     request_queue.cv_.notify_all();
   }
   // 等待
-  while ((request_queue.has_writer_ && request_queue.sharing_count_ > 0) ||  txn->GetState() != TransactionState::ABORTED) {
-    LOG_DEBUG("txn id =%d upgrading waiting ", txn->GetTransactionId());
-    if (txn->GetState() != TransactionState::ABORTED && (request_queue.sharing_count_ == 0 && !request_queue.has_writer_)) {
-        break;
+  while ((request_queue.has_writer_ && request_queue.sharing_count_ > 0) ||
+         txn->GetState() != TransactionState::ABORTED) {
+    // LOG_DEBUG("txn id =%d upgrading waiting ", txn->GetTransactionId());
+    if (txn->GetState() != TransactionState::ABORTED &&
+        (request_queue.sharing_count_ == 0 && !request_queue.has_writer_)) {
+      break;
     }
     request_queue.cv_.wait(uniq_lk);
 
     // LOG_DEBUG("sharing count = %d ,request_queue.has_writer_ ")
   }
-    // 在等待过程中可能被杀死
+  // 在等待过程中可能被杀死
   if (txn->GetState() == TransactionState::ABORTED) {
     request_queue.request_queue_.erase(itetator_list);
     return false;
