@@ -3,6 +3,8 @@
  */
 
 #include <atomic>
+#include <iostream>
+#include <ostream>
 #include <random>
 
 #include "common/exception.h"
@@ -10,6 +12,7 @@
 #include "concurrency/transaction.h"
 #include "concurrency/transaction_manager.h"
 #include "gtest/gtest.h"
+#include "recovery/log_manager.h"
 
 namespace bustub {
 
@@ -143,8 +146,9 @@ void WoundWaitDeadlockTest() {
                                  rid1);  // we should grant it here and make sure that txn1 is aborted.
     EXPECT_TRUE(res);
     CheckGrowing(&txn0);
+    std::cout << "before txn id = 0, get exclusive lock...\n";
     res = lock_mgr.LockExclusive(&txn0, rid0);  // this should abort the main txn
-
+    std::cout << "txn id = 0, got exclusive lock\n";
     EXPECT_TRUE(res);
     CheckGrowing(&txn0);
     txn_mgr.Commit(&txn0);
@@ -547,9 +551,9 @@ const size_t NUM_ITERS = 10;
  * die when it's waiting for previous txn is also waiting
  */
 TEST(LockManagerTest, WoundWaitTest) {
-  for (size_t i = 0; i < NUM_ITERS; i++) {
+  // for (size_t i = 0; i < NUM_ITERS; i++) {
     WoundWaitBasicTest();
-  }
+  // }
 }
 
 /*
