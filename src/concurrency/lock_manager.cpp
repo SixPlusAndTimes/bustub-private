@@ -79,12 +79,12 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
     request_queue.request_queue_.push_back(new_request);
     // 等待这个RID的请求队列中没有写锁
     while (request_queue.has_writer_ || txn->GetState() == TransactionState::ABORTED) {
-      LOG_DEBUG("txnid = %d sharelock waiting",txn->GetTransactionId());
-      request_queue.cv_.wait(uniq_lk);
       // 如果 被abort 或者 并发条件满足则break
       if (txn->GetState() != TransactionState::ABORTED && !request_queue.has_writer_) {
         break;
       } 
+      LOG_DEBUG("txnid = %d sharelock waiting",txn->GetTransactionId());
+      request_queue.cv_.wait(uniq_lk);
     }
 
     // 遍历request_list , 将先前加入的request 的granted字段改称true；
@@ -139,6 +139,7 @@ bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
         }
         request.granted_ = false;
         txnid_to_txnptr_map_[request.txn_id_]->SetState(TransactionState::ABORTED);
+        LOG_DEBUG("txn id = %d  kill txn = %d", txn->GetTransactionId(), request.txn_id_);
         request_queue.cv_.notify_all();
       }
       
@@ -146,12 +147,13 @@ bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
 
     request_queue.request_queue_.push_back(new_request);  // 先将请求加入队列
     // 等待队列中没有（老事务的）读锁（这样似乎读者会饿死写者？）, 或者被 aborte
-    while ((request_queue.sharing_count_ > 0 && request_queue.has_writer_) || txn->GetState() != TransactionState::ABORTED) {
-      LOG_DEBUG("txn id = %d waitin ", txn->GetTransactionId());
-      request_queue.cv_.wait(uniq_lk);
+    while ((request_queue.sharing_count_ > 0 && request_queue.has_writer_) || txn->GetState() != TransactionState::ABORTED) {    
       if (txn->GetState() != TransactionState::ABORTED && (request_queue.sharing_count_ == 0 && !request_queue.has_writer_)) {
         break;
       }
+      LOG_DEBUG("txn id = %d waitin ", txn->GetTransactionId());
+      request_queue.cv_.wait(uniq_lk);
+
     }
 
     std::list<LockRequest>::iterator itetator_list;
@@ -166,6 +168,7 @@ bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
       request_queue.request_queue_.erase(itetator_list);
       return false;
     }
+    LOG_DEBUG("txn id = %d, get lock", txn->GetTransactionId());
     (*itetator_list).granted_ = true;
     request_queue.has_writer_ = true;
   }
