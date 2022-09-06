@@ -72,13 +72,16 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
         request.granted_ = false;
         txnid_to_txnptr_map_[request.txn_id_]->SetState(TransactionState::ABORTED);
         LOG_DEBUG("txn id = %d abored by txn id = %d", request.txn_id_, txn->GetTransactionId());
+        request_queue.cv_.notify_all();
       }
-      request_queue.cv_.notify_all();
+      
     }
     request_queue.request_queue_.push_back(new_request);
     // 等待这个RID的请求队列中没有写锁
     while (request_queue.has_writer_ || txn->GetState() == TransactionState::ABORTED) {
+      LOG_DEBUG("txnid = %d sharelock waiting",txn->GetTransactionId());
       request_queue.cv_.wait(uniq_lk);
+      // 如果 被abort 或者 并发条件满足则break
       if (txn->GetState() != TransactionState::ABORTED && !request_queue.has_writer_) {
         break;
       } 
@@ -136,8 +139,9 @@ bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
         }
         request.granted_ = false;
         txnid_to_txnptr_map_[request.txn_id_]->SetState(TransactionState::ABORTED);
+        request_queue.cv_.notify_all();
       }
-      request_queue.cv_.notify_all();
+      
     }
 
     request_queue.request_queue_.push_back(new_request);  // 先将请求加入队列
@@ -198,10 +202,37 @@ bool LockManager::LockUpgrade(Transaction *txn, const RID &rid) {
   (*itetator_list).granted_ = false;
   (*itetator_list).lock_mode_ = LockMode::EXCLUSIVE;
   request_queue.upgrading_ = true;
-  // 等待
-  while (request_queue.has_writer_ && request_queue.sharing_count_ > 0) {
-    request_queue.cv_.wait(uniq_lk);
+
+  // wound wait算法 预防死锁
+  for (auto &request : request_queue.request_queue_) {
+    if (request.txn_id_ > txn->GetTransactionId()) {
+      // 新事务abort
+      if (request.lock_mode_ == LockMode::SHARED) {
+        request_queue.sharing_count_--;
+      } else {
+        request_queue.has_writer_ = false;
+      }
+      request.granted_ = false;
+      txnid_to_txnptr_map_[request.txn_id_]->SetState(TransactionState::ABORTED);
+    }
+    request_queue.cv_.notify_all();
   }
+  // 等待
+  while ((request_queue.has_writer_ && request_queue.sharing_count_ > 0) ||  txn->GetState() != TransactionState::ABORTED) {
+    LOG_DEBUG("txn id =%d upgrading waiting ", txn->GetTransactionId());
+    if (txn->GetState() != TransactionState::ABORTED && (request_queue.sharing_count_ == 0 && !request_queue.has_writer_)) {
+        break;
+    }
+    request_queue.cv_.wait(uniq_lk);
+
+    // LOG_DEBUG("sharing count = %d ,request_queue.has_writer_ ")
+  }
+    // 在等待过程中可能被杀死
+  if (txn->GetState() == TransactionState::ABORTED) {
+    request_queue.request_queue_.erase(itetator_list);
+    return false;
+  }
+
   (*itetator_list).granted_ = true;
   request_queue.has_writer_ = true;
   request_queue.upgrading_ = false;
