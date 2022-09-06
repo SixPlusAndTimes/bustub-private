@@ -35,6 +35,18 @@ bool UpdateExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) {
   get_tuple_succeed = child_executor_->Next(&tuple_to_be_updated, &rid_to_be_updated);
 
   if (get_tuple_succeed) {
+    // 只有REPEATABLE_READ 隔离级别下才会锁升级， 因为 在 uncmiitde 级别下， scan 不会加锁， 在
+    // commited下scan在返回前就解锁了
+    if (exec_ctx_->GetTransaction()->GetIsolationLevel() == IsolationLevel::REPEATABLE_READ) {
+      // LOG_DEBUG("upgrading lock...,txn id %d, ridpageid = %d, ridslotnum =
+      // %d",exec_ctx_->GetTransaction()->GetTransactionId(),rid->GetPageId(), rid->GetSlotNum());
+      exec_ctx_->GetLockManager()->LockUpgrade(exec_ctx_->GetTransaction(), rid_to_be_updated);
+      // LOG_DEBUG("upgraded txn id %d, ridpageid = %d, ridslotnum =
+      // %d",exec_ctx_->GetTransaction()->GetTransactionId(),rid->GetPageId(), rid->GetSlotNum() ); LOG_DEBUG("upgrading
+      // lock done");
+    } else {
+      exec_ctx_->GetLockManager()->LockExclusive(exec_ctx_->GetTransaction(), rid_to_be_updated);
+    }
     Tuple updated_tuple = GenerateUpdatedTuple(tuple_to_be_updated);  // 生成新的tuple
     bool update_tuple_in_heap_succeed =
         table_info_->table_->UpdateTuple(updated_tuple, rid_to_be_updated, exec_ctx_->GetTransaction());

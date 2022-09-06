@@ -17,6 +17,7 @@
 #include "catalog/catalog.h"
 #include "catalog/column.h"
 #include "common/config.h"
+#include "common/logger.h"
 #include "common/rid.h"
 #include "concurrency/transaction.h"
 #include "storage/table/table_heap.h"
@@ -43,9 +44,20 @@ bool SeqScanExecutor::Next(Tuple *tuple, RID *rid) {
   bool successed = false;
   while (tableheap_iterator_ != table_info_->table_->End()) {
     // &(*tableheap_iterator_) : 对迭代器解引用得到 Tuple& , 再对Tuple取地址得到 Tuple *
+
+    //除了 READ_UNCOMMITER 隔离级别，其他级别都需要加读锁
+    if (exec_ctx_->GetTransaction()->GetIsolationLevel() != IsolationLevel::READ_UNCOMMITTED) {
+      exec_ctx_->GetLockManager()->LockShared(exec_ctx_->GetTransaction(), tableheap_iterator_->GetRid());
+      // LOG_DEBUG("lockshared txn id %d, ridpageid = %d, ridslotnum =
+      // %d",exec_ctx_->GetTransaction()->GetTransactionId(),tableheap_iterator_->GetRid().GetPageId(),
+      // tableheap_iterator_->GetRid().GetSlotNum() );
+    }
     auto predicate = plan_->GetPredicate();
     if (predicate != nullptr && !predicate->Evaluate(&(*tableheap_iterator_), &(table_info_->schema_)).GetAs<bool>()) {
-      // 不满足predicate
+      // 不满足predicate, 且如果隔离等级为read_commited 则立刻释放锁
+      if (exec_ctx_->GetTransaction()->GetIsolationLevel() == IsolationLevel::READ_COMMITTED) {
+        exec_ctx_->GetLockManager()->Unlock(exec_ctx_->GetTransaction(), tableheap_iterator_->GetRid());
+      }
       ++tableheap_iterator_;
       continue;
     }
@@ -69,6 +81,10 @@ bool SeqScanExecutor::Next(Tuple *tuple, RID *rid) {
 
     // *rid = tuple->GetRid();  错误，输出元组是没有RID这个说法的
     *rid = tableheap_iterator_->GetRid();  // 只能从表元组中得到对应的RID
+    // 如果隔离等级为read_commited 则读完立刻释放锁
+    if (exec_ctx_->GetTransaction()->GetIsolationLevel() == IsolationLevel::READ_COMMITTED) {
+      exec_ctx_->GetLockManager()->Unlock(exec_ctx_->GetTransaction(), tableheap_iterator_->GetRid());
+    }
     ++tableheap_iterator_;
     return successed;
   }

@@ -370,7 +370,7 @@ TEST_F(GradingTransactionTest, RepeatableReadsTest) {
 }
 
 // NOLINTNEXTLINE
-TEST_F(GradingTransactionTest, DISABLED_IntegratedTest) {
+TEST_F(GradingTransactionTest, IntegratedTest) {
   //  txn1 ->        scan -> join -> aggregate
   //  txn2 ->    delete one tuple -> commit
   //  txn3 -> scan
