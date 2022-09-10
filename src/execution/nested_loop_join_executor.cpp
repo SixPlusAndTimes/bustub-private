@@ -42,8 +42,6 @@ bool NestedLoopJoinExecutor::Next(Tuple *tuple, RID *rid) {
   bool join_succeed = false;
   Tuple right_tuple;
   RID right_rid;
-  //   static int left_iter_nums = 0;
-  //   static int right_iter_nums = 0;
 
   while (true) {
     bool got_right_tuple = right_executor_->Next(&right_tuple, &right_rid);

@@ -39,7 +39,7 @@ RID 是一个元组在数据库中的定位信息， RID由page_id 和 slot_num�
 ~~~cpp
     *tuple = Tuple(values, output_shema_);
 ~~~
-这样创建的元组是没有RID的， 它根本不存在于数据库中，也就没有定位信息。这之后执行的`tuple->GetRid()`得到的是一个非法的RID。如果不注意，会在delete测试中发生错误
+这样创建的元组是没有RID的， 它根本不存在于数据库中，也就没有定位信息。这之后执行的`tuple->GetRid()`得到的是一个非法的RID。如果不注意，会在delete测试中发生错误，因为delete是更具rid定位一条记录的。
 
 # 构造元组
 使用某个expression构造元组时，一定要传入相应的schema，否则很容易产生越界错误 
