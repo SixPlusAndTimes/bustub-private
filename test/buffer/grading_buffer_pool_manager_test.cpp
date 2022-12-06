@@ -2,11 +2,11 @@
 //
 //                         BusTub
 //
-// parallel_buffer_pool_manager_test.cpp
+// buffer_pool_manager_instance_test.cpp
 //
-// Identification: test/buffer/parallel_buffer_pool_manager_test.cpp
+// Identification: test/buffer/buffer_pool_manager_instance_test.cpp
 //
-// Copyright (c) 2015-2021, Carnegie Mellon University Database Group
+// Copyright (c) 2015-2019, Carnegie Mellon University Database Group
 //
 //===----------------------------------------------------------------------===//
 
@@ -19,18 +19,21 @@
 #include <thread>  // NOLINT
 #include <vector>
 
-#include "buffer/parallel_buffer_pool_manager.h"
+#include "buffer/buffer_pool_manager.h"  // NOLINT
+#include "buffer/buffer_pool_manager_instance.h"
 #include "gtest/gtest.h"
 
 namespace bustub {
 
+#define BufferPoolManager MockBufferPoolManager
+
 // NOLINTNEXTLINE
-TEST(ParallelBufferPoolManagerTest, SampleTest) {
+TEST(BufferPoolManagerInstanceTest, SampleTest) {
   const std::string db_name = "test.db";
   const size_t buffer_pool_size = 10;
 
   auto *disk_manager = new DiskManager(db_name);
-  auto *bpm = new ParallelBufferPoolManager(1, buffer_pool_size, disk_manager);
+  auto *bpm = new BufferPoolManagerInstance(buffer_pool_size, disk_manager);
 
   page_id_t page_id_temp;
   auto *page0 = bpm->NewPage(&page_id_temp);
@@ -78,12 +81,12 @@ TEST(ParallelBufferPoolManagerTest, SampleTest) {
   delete disk_manager;
 }
 
-TEST(ParallelBufferPoolManagerTest, BinaryDataTest) {
+TEST(BufferPoolManagerInstanceTest, BinaryDataTest) {
   const std::string db_name = "test.db";
   const size_t buffer_pool_size = 10;
 
   auto *disk_manager = new DiskManager(db_name);
-  auto *bpm = new ParallelBufferPoolManager(1, buffer_pool_size, disk_manager);
+  auto *bpm = new BufferPoolManagerInstance(buffer_pool_size, disk_manager);
 
   page_id_t page_id_temp;
   auto *page0 = bpm->NewPage(&page_id_temp);
@@ -138,10 +141,10 @@ TEST(ParallelBufferPoolManagerTest, BinaryDataTest) {
   delete disk_manager;
 }
 
-TEST(ParallelBufferPoolManagerTest, NewPage) {
+TEST(BufferPoolManagerInstanceTest, NewPage) {
   page_id_t temp_page_id;
   DiskManager *disk_manager = new DiskManager("test.db");
-  auto *bpm = new ParallelBufferPoolManager(1, 10, disk_manager);
+  auto *bpm = new BufferPoolManagerInstance(10, disk_manager);
 
   std::vector<page_id_t> page_ids;
 
@@ -200,9 +203,9 @@ TEST(ParallelBufferPoolManagerTest, NewPage) {
   delete disk_manager;
 }
 
-TEST(ParallelBufferPoolManagerTest, UnpinPage) {
+TEST(BufferPoolManagerInstanceTest, UnpinPage) {
   DiskManager *disk_manager = new DiskManager("test.db");
-  auto bpm = new ParallelBufferPoolManager(1, 2, disk_manager);
+  auto bpm = new BufferPoolManagerInstance(2, disk_manager);
 
   page_id_t pageid0;
   auto page0 = bpm->NewPage(&pageid0);
@@ -256,10 +259,10 @@ TEST(ParallelBufferPoolManagerTest, UnpinPage) {
   delete disk_manager;
 }
 
-TEST(ParallelBufferPoolManagerTest, FetchPage) {
+TEST(BufferPoolManagerInstanceTest, FetchPage) {
   page_id_t temp_page_id;
   DiskManager *disk_manager = new DiskManager("test.db");
-  auto bpm = new ParallelBufferPoolManager(1, 10, disk_manager);
+  auto bpm = new BufferPoolManagerInstance(10, disk_manager);
 
   std::vector<Page *> pages;
   std::vector<page_id_t> page_ids;
@@ -362,10 +365,10 @@ TEST(ParallelBufferPoolManagerTest, FetchPage) {
   delete disk_manager;
 }
 
-TEST(ParallelBufferPoolManagerTest, DeletePage) {
+TEST(BufferPoolManagerInstanceTest, DeletePage) {
   page_id_t temp_page_id;
   DiskManager *disk_manager = new DiskManager("test.db");
-  auto bpm = new ParallelBufferPoolManager(1, 10, disk_manager);
+  auto bpm = new BufferPoolManagerInstance(10, disk_manager);
 
   std::vector<Page *> pages;
   std::vector<page_id_t> page_ids;
@@ -441,9 +444,9 @@ TEST(ParallelBufferPoolManagerTest, DeletePage) {
   delete disk_manager;
 }
 
-TEST(ParallelBufferPoolManagerTest, IsDirty) {
+TEST(BufferPoolManagerInstanceTest, IsDirty) {
   DiskManager *disk_manager = new DiskManager("test.db");
-  auto bpm = new ParallelBufferPoolManager(1, 1, disk_manager);
+  auto bpm = new BufferPoolManagerInstance(1, disk_manager);
 
   // Make new page and write to it
   page_id_t pageid0;
@@ -488,12 +491,12 @@ TEST(ParallelBufferPoolManagerTest, IsDirty) {
   delete disk_manager;
 }
 
-TEST(ParallelBufferPoolManagerTest, ConcurrencyTest) {
+TEST(BufferPoolManagerInstanceTest, ConcurrencyTest) {
   const int num_threads = 5;
   const int num_runs = 50;
   for (int run = 0; run < num_runs; run++) {
     DiskManager *disk_manager = new DiskManager("test.db");
-    std::shared_ptr<ParallelBufferPoolManager> bpm{new ParallelBufferPoolManager(1, 50, disk_manager)};
+    std::shared_ptr<BufferPoolManagerInstance> bpm{new BufferPoolManagerInstance(50, disk_manager)};
     std::vector<std::thread> threads;
 
     for (int tid = 0; tid < num_threads; tid++) {
@@ -533,10 +536,10 @@ TEST(ParallelBufferPoolManagerTest, ConcurrencyTest) {
   }
 }
 
-TEST(ParallelBufferPoolManagerTest, IntegratedTest) {
+TEST(BufferPoolManagerInstanceTest, IntegratedTest) {
   page_id_t temp_page_id;
   DiskManager *disk_manager = new DiskManager("test.db");
-  auto bpm = new ParallelBufferPoolManager(1, 10, disk_manager);
+  auto bpm = new BufferPoolManagerInstance(10, disk_manager);
 
   std::vector<page_id_t> page_ids;
   for (int j = 0; j < 1000; j++) {
@@ -569,10 +572,10 @@ TEST(ParallelBufferPoolManagerTest, IntegratedTest) {
   delete disk_manager;
 }
 
-TEST(ParallelBufferPoolManagerTest, HardTest_1) {
+TEST(BufferPoolManagerInstanceTest, HardTest_1) {
   page_id_t temp_page_id;
   DiskManager *disk_manager = new DiskManager("test.db");
-  auto bpm = new ParallelBufferPoolManager(1, 10, disk_manager);
+  auto bpm = new BufferPoolManagerInstance(10, disk_manager);
 
   std::vector<page_id_t> page_ids;
   for (int j = 0; j < 1000; j++) {
@@ -633,12 +636,12 @@ TEST(ParallelBufferPoolManagerTest, HardTest_1) {
   delete disk_manager;
 }
 
-TEST(ParallelBufferPoolManagerTest, HardTest_2) {
+TEST(BufferPoolManagerInstanceTest, HardTest_2) {
   const int num_threads = 5;
   const int num_runs = 50;
   for (int run = 0; run < num_runs; run++) {
     auto *disk_manager = new DiskManager("test.db");
-    std::shared_ptr<ParallelBufferPoolManager> bpm{new ParallelBufferPoolManager(1, 50, disk_manager)};
+    std::shared_ptr<BufferPoolManagerInstance> bpm{new BufferPoolManagerInstance(50, disk_manager)};
     std::vector<std::thread> threads;
 
     page_id_t temp_page_id;
@@ -724,12 +727,12 @@ TEST(ParallelBufferPoolManagerTest, HardTest_2) {
   }
 }
 
-TEST(ParallelBufferPoolManagerTest, HardTest_3) {
+TEST(BufferPoolManagerInstanceTest, HardTest_3) {
   const int num_threads = 5;
   const int num_runs = 50;
   for (int run = 0; run < num_runs; run++) {
     auto *disk_manager = new DiskManager("test.db");
-    std::shared_ptr<ParallelBufferPoolManager> bpm{new ParallelBufferPoolManager(1, 50, disk_manager)};
+    std::shared_ptr<BufferPoolManagerInstance> bpm{new BufferPoolManagerInstance(50, disk_manager)};
     std::vector<std::thread> threads;
 
     page_id_t temp_page_id;
@@ -839,12 +842,12 @@ TEST(ParallelBufferPoolManagerTest, HardTest_3) {
   }
 }
 
-TEST(ParallelBufferPoolManagerTest, HardTest_4) {
+TEST(BufferPoolManagerInstanceTest, HardTest_4) {
   const int num_threads = 5;
   const int num_runs = 50;
   for (int run = 0; run < num_runs; run++) {
     auto *disk_manager = new DiskManager("test.db");
-    std::shared_ptr<ParallelBufferPoolManager> bpm{new ParallelBufferPoolManager(1, 50, disk_manager)};
+    std::shared_ptr<BufferPoolManagerInstance> bpm{new BufferPoolManagerInstance(50, disk_manager)};
     std::vector<std::thread> threads;
 
     page_id_t temp_page_id;
@@ -969,84 +972,6 @@ TEST(ParallelBufferPoolManagerTest, HardTest_4) {
     remove("test.log");
     delete disk_manager;
   }
-}
-
-// Tests above are duplicates of BufferPoolManagerTests with 1 instance -- behavior is identical.
-// New targeted unit tests begin below.
-
-TEST(ParallelBufferPoolManagerTest, GetPoolSize) {
-  DiskManager *disk_manager = new DiskManager("test.db");
-  auto pool_size = 10;
-  auto num_instances = 10;
-
-  auto *bpm = new ParallelBufferPoolManager(num_instances, pool_size, disk_manager);
-
-  EXPECT_EQ(num_instances * pool_size, bpm->GetPoolSize());
-
-  disk_manager->ShutDown();
-
-  remove("test.db");
-  delete bpm;
-  delete disk_manager;
-}
-
-TEST(ParallelBufferPoolManagerTest, RoundRobinNewPage) {
-  auto *disk_manager = new DiskManager("test.db");
-  auto pool_size = 1;
-  auto num_instances = 10;
-
-  auto *bpm = new ParallelBufferPoolManager(num_instances, pool_size, disk_manager);
-
-  page_id_t page_id_temp;
-
-  // Scenario: We should be able to create new pages until we fill up all BPMIs.
-  for (size_t i = 0; i < 10; i++) {
-    EXPECT_NE(nullptr, bpm->NewPage(&page_id_temp));
-    EXPECT_EQ(i, page_id_temp);
-  }
-
-  // Scenario: Once the buffer pool is full, we should not be able to create any new pages.
-  for (size_t i = 10; i < 30; i++) {
-    EXPECT_EQ(nullptr, bpm->NewPage(&page_id_temp));
-  }
-
-  // Scenario: The BPMI to start at should have looped around to 0. Unpin in BPMI 6, and see that it
-  // returns the correct page_id for that BPMI.
-  page_id_t unpin_page = 6;
-  bpm->UnpinPage(unpin_page, false);
-
-  EXPECT_NE(nullptr, bpm->NewPage(&page_id_temp));
-  EXPECT_EQ(unpin_page + num_instances, page_id_temp);
-
-  // Scenario: The BPMI to start at should be 7. Unpin in BPMI 6 and BPMI 7, and see that it
-  // returns the correct page_id for that BPMI.
-  unpin_page = 6;
-  bpm->UnpinPage(unpin_page, false);
-  unpin_page = 7;
-  bpm->UnpinPage(unpin_page, false);
-
-  EXPECT_NE(nullptr, bpm->NewPage(&page_id_temp));
-  EXPECT_EQ(unpin_page + num_instances, page_id_temp);
-
-  // Scenario: The BPMI to start at should be 8. Everything is pinned. Allocating should fail.
-  EXPECT_EQ(nullptr, bpm->NewPage(&page_id_temp));  // advance to 9 after looping
-  EXPECT_EQ(nullptr, bpm->NewPage(&page_id_temp));  // advance to 0 after looping
-
-  // Scenario. The BPMI to start at should be 0. Unpin a couple, we should get a page in BPMI 1.
-  unpin_page = 3;
-  bpm->UnpinPage(unpin_page, false);
-  unpin_page = 1;
-  bpm->UnpinPage(unpin_page, false);
-
-  EXPECT_NE(nullptr, bpm->NewPage(&page_id_temp));
-  EXPECT_EQ(unpin_page + num_instances, page_id_temp);
-
-  // Shutdown the disk manager and remove the temporary file we created.
-  disk_manager->ShutDown();
-  remove("test.db");
-
-  delete bpm;
-  delete disk_manager;
 }
 
 }  // namespace bustub
