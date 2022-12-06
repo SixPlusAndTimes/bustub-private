@@ -56,8 +56,15 @@ bool BufferPoolManagerInstance::FlushPgImp(page_id_t page_id) {
   std::lock_guard<std::mutex> lock(latch_);
   // latch_.lock();
   bool is_flushed = false;
-  if (page_table_.count(page_id) != 0) {
-    Page *page_to_flush = &pages_[page_table_[page_id]];
+  // if (page_table_.count(page_id) != 0) {
+  //   Page *page_to_flush = &pages_[page_table_[page_id]];
+  //   disk_manager_->WritePage(page_id, page_to_flush->GetData());
+  //   page_to_flush->is_dirty_ = false;
+  //   is_flushed = true;
+  // }
+  auto iter = page_table_.find(page_id);
+  if (iter != page_table_.end()) {
+    Page *page_to_flush = &pages_[iter->second];
     disk_manager_->WritePage(page_id, page_to_flush->GetData());
     page_to_flush->is_dirty_ = false;
     is_flushed = true;
@@ -71,7 +78,7 @@ void BufferPoolManagerInstance::FlushAllPgsImp() {
   std::lock_guard<std::mutex> lock(latch_);
   // latch_.lock();
   Page *page_to_flush;
-  for (std::pair<page_id_t, frame_id_t> element : page_table_) {
+  for (auto &element : page_table_) {
     page_to_flush = &pages_[element.second];
     disk_manager_->WritePage(element.first, page_to_flush->GetData());
     page_to_flush->is_dirty_ = false;  // 对比别人代码看出来的
@@ -130,9 +137,19 @@ Page *BufferPoolManagerInstance::FetchPgImp(page_id_t page_id) {
   Page *fetched_page = nullptr;
   frame_id_t frame_id_to_fetch;
   // 1.search in the  pagetable
-  if (page_table_.count(page_id) != 0) {
+  // if (page_table_.count(page_id) != 0) {
+  //   // 1.1 在bufferpool中存在相应的page
+  //   frame_id_to_fetch = page_table_[page_id];
+  //   fetched_page = &pages_[frame_id_to_fetch];
+  //   fetched_page->pin_count_++;         // pincount 加一
+  //   replacer_->Pin(frame_id_to_fetch);  // 通知replaceer,不要将这个frame考虑在lru算法的范围内
+  //   // latch_.unlock();
+  //   return &pages_[frame_id_to_fetch];
+  // }
+  auto iter = page_table_.find(page_id);
+  if (iter != page_table_.end()) {
     // 1.1 在bufferpool中存在相应的page
-    frame_id_to_fetch = page_table_[page_id];
+    frame_id_to_fetch = iter->second;
     fetched_page = &pages_[frame_id_to_fetch];
     fetched_page->pin_count_++;         // pincount 加一
     replacer_->Pin(frame_id_to_fetch);  // 通知replaceer,不要将这个frame考虑在lru算法的范围内
@@ -168,16 +185,22 @@ bool BufferPoolManagerInstance::DeletePgImp(page_id_t page_id) {
   // 2.   If P exists, but has a non-zero pin-count, return false. Someone is using the page.
   // 3.   Otherwise, P can be deleted. Remove P from the page table, reset its metadata and return it to the free list.
 
-  // 啥玩意？哪来的Deallocate！？
   std::lock_guard<std::mutex> lock(latch_);
   // latch_.lock();
-  if (page_table_.count(page_id) == 0) {
-    // latch_.unlock();
+  // if (page_table_.count(page_id) == 0) {
+  //   // latch_.unlock();
+  //   return true;
+  // }
+  auto iter = page_table_.find(page_id);
+  if (iter == page_table_.end()) {
     return true;
   }
+  // frame_id_t frame_id_to_delete = page_table_[page_id];
+  // Page *page_to_delete = &pages_[frame_id_to_delete];
 
-  frame_id_t frame_id_to_delete = page_table_[page_id];
+  frame_id_t frame_id_to_delete = iter->second;
   Page *page_to_delete = &pages_[frame_id_to_delete];
+
   if (page_to_delete->pin_count_ != 0) {
     // some else is using the page
     // latch_.unlock();
@@ -205,13 +228,20 @@ bool BufferPoolManagerInstance::DeletePgImp(page_id_t page_id) {
 bool BufferPoolManagerInstance::UnpinPgImp(page_id_t page_id, bool is_dirty) {
   std::lock_guard<std::mutex> lock(latch_);
   // latch_.lock();
-  if (page_table_.count(page_id) == 0) {
-    // latch_.unlock();
+  // if (page_table_.count(page_id) == 0) {
+  //   // latch_.unlock();
+  //   return false;
+  // }
+  // frame_id_t frame_id_unpin = page_table_[page_id];
+  // Page *page_to_unpin = &pages_[frame_id_unpin];
+
+  auto iter = page_table_.find(page_id);
+  if (iter == page_table_.end()) {
     return false;
   }
-
-  frame_id_t frame_id_unpin = page_table_[page_id];
+  frame_id_t frame_id_unpin = iter->second;
   Page *page_to_unpin = &pages_[frame_id_unpin];
+
   if (page_to_unpin->pin_count_ <= 0) {
     // latch_.unlock();
     return false;

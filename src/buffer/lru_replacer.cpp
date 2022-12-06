@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "buffer/lru_replacer.h"
+#include <map>
 
 namespace bustub {
 // 容量这个属性好像没有用到阿
@@ -39,11 +40,16 @@ bool LRUReplacer::Victim(frame_id_t *frame_id) {
 void LRUReplacer::Pin(frame_id_t frame_id) {
   std::lock_guard<std::mutex> lock(latch_);
   // latch_.lock();
-  if (map_.count(frame_id) > 0) {
-    // std::list<frame_id_t>::iterator to_remove = map_[frame_id];
-    list_.erase(map_[frame_id]);  //下面两个顺序不能反
-    map_.erase(frame_id);
-    // latch_.unlock();
+  // if (map_.count(frame_id) > 0) {
+  //   // std::list<frame_id_t>::iterator to_remove = map_[frame_id];
+  //   list_.erase(map_[frame_id]);  //下面两个顺序不能反
+  //   map_.erase(frame_id);
+  //   // latch_.unlock();
+  // }
+  std::unordered_map<frame_id_t, std::list<frame_id_t>::iterator>::iterator iter = map_.find(frame_id);
+  if (iter != map_.end()) {
+    list_.erase(iter->second);  //下面两个顺序不能反
+    map_.erase(iter);
   }
 }
 
