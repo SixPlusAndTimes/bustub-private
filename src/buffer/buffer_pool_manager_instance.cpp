@@ -54,7 +54,6 @@ BufferPoolManagerInstance::~BufferPoolManagerInstance() {
 bool BufferPoolManagerInstance::FlushPgImp(page_id_t page_id) {
   // Make sure you call DiskManager::WritePage!
   std::lock_guard<std::mutex> lock(latch_);
-  // latch_.lock();
   bool is_flushed = false;
   // if (page_table_.count(page_id) != 0) {
   //   Page *page_to_flush = &pages_[page_table_[page_id]];
@@ -69,21 +68,18 @@ bool BufferPoolManagerInstance::FlushPgImp(page_id_t page_id) {
     page_to_flush->is_dirty_ = false;
     is_flushed = true;
   }
-  // latch_.unlock();
   return is_flushed;
 }
 
 void BufferPoolManagerInstance::FlushAllPgsImp() {
-  // You can do it!
   std::lock_guard<std::mutex> lock(latch_);
-  // latch_.lock();
+
   Page *page_to_flush;
   for (auto &element : page_table_) {
     page_to_flush = &pages_[element.second];
     disk_manager_->WritePage(element.first, page_to_flush->GetData());
     page_to_flush->is_dirty_ = false;  // 对比别人代码看出来的
   }
-  // latch_.unlock();
 }
 
 // Creates a new page in the buffer pool. ,注意这是创建一个新的页,得立即写回磁盘!
@@ -173,7 +169,6 @@ Page *BufferPoolManagerInstance::FetchPgImp(page_id_t page_id) {
   }
 
   // 如果在bufferpool中的所有页都是被pin住了,表示失败,返回nullptr
-  // latch_.unlock();
   return fetched_page;
 }
 
@@ -184,26 +179,23 @@ bool BufferPoolManagerInstance::DeletePgImp(page_id_t page_id) {
   // 1.   If P does not exist, return true.
   // 2.   If P exists, but has a non-zero pin-count, return false. Someone is using the page.
   // 3.   Otherwise, P can be deleted. Remove P from the page table, reset its metadata and return it to the free list.
-
   std::lock_guard<std::mutex> lock(latch_);
-  // latch_.lock();
   // if (page_table_.count(page_id) == 0) {
   //   // latch_.unlock();
   //   return true;
   // }
+  // frame_id_t frame_id_to_delete = page_table_[page_id];
+  // Page *page_to_delete = &pages_[frame_id_to_delete];
   auto iter = page_table_.find(page_id);
   if (iter == page_table_.end()) {
     return true;
   }
-  // frame_id_t frame_id_to_delete = page_table_[page_id];
-  // Page *page_to_delete = &pages_[frame_id_to_delete];
 
   frame_id_t frame_id_to_delete = iter->second;
   Page *page_to_delete = &pages_[frame_id_to_delete];
 
   if (page_to_delete->pin_count_ != 0) {
     // some else is using the page
-    // latch_.unlock();
     return false;
   }
 
@@ -219,7 +211,7 @@ bool BufferPoolManagerInstance::DeletePgImp(page_id_t page_id) {
   page_to_delete->pin_count_ = 0;
 
   free_list_.push_back(frame_id_to_delete);
-  // latch_.unlock();
+
   return true;
 }
 
@@ -227,9 +219,7 @@ bool BufferPoolManagerInstance::DeletePgImp(page_id_t page_id) {
 // 这里强调本线程 ！！ 为什么？ 看看设置 is_dirty的逻辑。
 bool BufferPoolManagerInstance::UnpinPgImp(page_id_t page_id, bool is_dirty) {
   std::lock_guard<std::mutex> lock(latch_);
-  // latch_.lock();
   // if (page_table_.count(page_id) == 0) {
-  //   // latch_.unlock();
   //   return false;
   // }
   // frame_id_t frame_id_unpin = page_table_[page_id];
@@ -243,7 +233,6 @@ bool BufferPoolManagerInstance::UnpinPgImp(page_id_t page_id, bool is_dirty) {
   Page *page_to_unpin = &pages_[frame_id_unpin];
 
   if (page_to_unpin->pin_count_ <= 0) {
-    // latch_.unlock();
     return false;
   }
 

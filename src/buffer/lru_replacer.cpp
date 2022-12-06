@@ -22,16 +22,13 @@ LRUReplacer::~LRUReplacer() = default;
 // store its contents in the output parameter and return True. If the Replacer is empty return False.
 bool LRUReplacer::Victim(frame_id_t *frame_id) {
   std::lock_guard<std::mutex> lock(latch_);
-  // latch_.lock();
   if (list_.empty()) {
-    // latch_.unlock();
     return false;
   }
   *frame_id = list_.back();
   list_.pop_back();
   map_.erase(*frame_id);
 
-  // latch_.unlock();
   return true;
 }
 
@@ -39,12 +36,12 @@ bool LRUReplacer::Victim(frame_id_t *frame_id) {
 // It should remove the frame containing the pinned page from the LRUReplacer.
 void LRUReplacer::Pin(frame_id_t frame_id) {
   std::lock_guard<std::mutex> lock(latch_);
-  // latch_.lock();
+
   // if (map_.count(frame_id) > 0) {
   //   // std::list<frame_id_t>::iterator to_remove = map_[frame_id];
   //   list_.erase(map_[frame_id]);  //下面两个顺序不能反
   //   map_.erase(frame_id);
-  //   // latch_.unlock();
+
   // }
   std::unordered_map<frame_id_t, std::list<frame_id_t>::iterator>::iterator iter = map_.find(frame_id);
   if (iter != map_.end()) {
@@ -59,14 +56,13 @@ void LRUReplacer::Pin(frame_id_t frame_id) {
 // 本来还以为要加timestamp啥的呢
 void LRUReplacer::Unpin(frame_id_t frame_id) {
   std::lock_guard<std::mutex> lock(latch_);
-  // latch_.lock();
+
   if (map_.count(frame_id) == 0) {
     list_.push_front(frame_id);
     //  该写法错误 map_.insert(frame_id, list_.front()); 参考cppreference ，insert
-    //  的参数应该是一个std::pair才可以。我靠，vscode竟然不报错！
+    //  的参数应该是一个std::pair才可以。
     // map_[frame_id] = list_.begin(); // 这个写法，test_memory会报错
     map_.insert({frame_id, list_.begin()});
-    // latch_.unlock();
   }
 }
 
