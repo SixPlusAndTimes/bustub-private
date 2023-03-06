@@ -139,7 +139,7 @@ void HashTableDirectoryPage::VerifyIntegrity() {
     if (curr_count != required_count) {
       LOG_WARN("Verify Integrity: curr_count: %u, required_count %u, for page_id: %u", curr_ld, required_count,
                curr_page_id);
-      PrintDirectory();
+      // PrintDirectory();
       assert(curr_count == required_count);
     }
     it++;

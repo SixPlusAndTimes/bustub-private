@@ -475,7 +475,7 @@ void HASH_TABLE_TYPE::PrintDir() {
   HashTableDirectoryPage *dir_page = FetchDirectoryPage();
   uint32_t dir_size = dir_page->Size();
 
-  dir_page->PrintDirectory();
+  // dir_page->PrintDirectory();
   // printf("dir size is: %d\n", dir_size);
   for (uint32_t idx = 0; idx < dir_size; idx++) {
     auto bucket_page_id = dir_page->GetBucketPageId(idx);
