@@ -37,10 +37,8 @@ void DistinctExecutor::Init() {
     for (uint32_t i = 0; i < plan_->OutputSchema()->GetColumnCount(); i++) {
       values.push_back(tuple.GetValue(schema, i));
     }
-    distinct_key = {values};
-    set_.insert(distinct_key);
+    set_.insert({values});
 
-    // values.clear();
   }
   // int set_size = static_cast<int>(set_.size());
   // LOG_DEBUG("set_size == %d",set_size );
