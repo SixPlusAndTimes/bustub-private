@@ -414,7 +414,7 @@ bool HASH_TABLE_TYPE::ExtraMerge(Transaction *transaction, const KeyType &key, c
   table_latch_.WLock();
   // 扫描整个目录看看是否有空的bucket， 如果有则合并
   bool has_merged = false;      // 标记每次否合并操作
-  bool has_merged_all = false;  // 标记整个循环是否有合并操作
+  bool has_merged_all = false;  // 标记整个循环是否有合并操作, 如果有则表示directory页面
   // extra merge 的 key 再次hash到的bucket一定不是空， 但是经过shrink后要检查这个桶的镜像桶是否为空，如果是则合并
   HashTableDirectoryPage *dir_page = FetchDirectoryPage();
 
@@ -475,7 +475,7 @@ void HASH_TABLE_TYPE::PrintDir() {
   HashTableDirectoryPage *dir_page = FetchDirectoryPage();
   uint32_t dir_size = dir_page->Size();
 
-  dir_page->PrintDirectory();
+  // dir_page->PrintDirectory();
   // printf("dir size is: %d\n", dir_size);
   for (uint32_t idx = 0; idx < dir_size; idx++) {
     auto bucket_page_id = dir_page->GetBucketPageId(idx);
