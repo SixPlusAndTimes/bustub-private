@@ -38,3 +38,20 @@ make test_name
 - 试着在C++语法层面对代码进行优化，尤其是在C++11的使用方面
 - 调整代码结构，使其更精简
 - 调整算法逻辑，使其更快速
+
+# 优化lab1
+
+执行测试程序10次，计算其平均执行时间，shell脚本在build目录下
+初始：
+lru_replacer_test : 0.227秒
+
+buffer_pool_manager_instance_test  2.999
+
+parallel_buffer_pool_manager_test  3.116
+
+主要关于unordered_map的使用方面的优化：
+                    0.229
+                    2.929
+                    3.026
+
+感觉没啥优化的样子
