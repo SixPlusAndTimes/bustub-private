@@ -12,13 +12,16 @@
 
 #include "concurrency/lock_manager.h"
 
+#include <iterator>
 #include <list>
 #include <mutex>  // NOLINT
+#include <ostream>
 #include <tuple>
 #include <utility>
 #include <vector>
 #include "common/logger.h"
 #include "concurrency/transaction.h"
+#include "storage/table/table_iterator.h"
 #include "storage/table/tuple.h"
 
 namespace bustub {
@@ -76,10 +79,15 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
         // LOG_DEBUG("txn id = %d abored by txn id = %d", request.txn_id_, txn->GetTransactionId());
         // 唤醒被wound wait算法abort的事务
         request_queue.cv_.notify_all();
-      }else {
+      }else if (request.txn_id_ < txn->GetTransactionId()){
         // 如果改事务比本事务老，则判断它是否是读锁
         if (request.lock_mode_ == LockMode::EXCLUSIVE) {
           exist_writer = true;
+        }
+      }else if(request.txn_id_ ==txn->GetTransactionId()){
+        if (request.granted_) 
+        { 
+          return true;
         }
       }
     }
@@ -110,9 +118,12 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
     }
     (*itetator_list).granted_ = true;
     request_queue.sharing_count_++;
+
+    // std::cout <<  static_cast<int>(itetator_list->lock_mode_)  << std::endl;
   }
   // 这个事务获得了读锁
   txn->GetSharedLockSet()->emplace(rid);
+  
   return true;
 }
 
@@ -137,26 +148,26 @@ bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
   } else {
     LockRequestQueue &request_queue = lock_table_[rid];
     // wound wait算法 预防死锁
-    int sharing_count = 0;
-    bool has_wrtiter = false;
-    for (auto &request : request_queue.request_queue_) {
-      if (request.txn_id_ > txn->GetTransactionId()) {
-        // 新事务abort
-        request.granted_ = false;
-        txnid_to_txnptr_map_[request.txn_id_]->SetState(TransactionState::ABORTED);
-        // LOG_DEBUG("txn id = %d  kill txn = %d", txn->GetTransactionId(), request.txn_id_);
-        request_queue.cv_.notify_all();
-      } else {
-        if (request.lock_mode_ == LockMode::SHARED) {
-          sharing_count++;
-        } else {
-          has_wrtiter = true;
-        }
-      }
-    }
-    request_queue.has_writer_ = has_wrtiter;
-    request_queue.sharing_count_ = sharing_count;
-
+    // int sharing_count = 0;
+    // bool has_wrtiter = false;
+    // for (auto &request : request_queue.request_queue_) {
+    //   if (request.txn_id_ > txn->GetTransactionId()) {
+    //     // 新事务abort
+    //     request.granted_ = false;
+    //     txnid_to_txnptr_map_[request.txn_id_]->SetState(TransactionState::ABORTED);
+    //     // LOG_DEBUG("txn id = %d  kill txn = %d", txn->GetTransactionId(), request.txn_id_);
+    //     request_queue.cv_.notify_all();
+    //   } else {
+    //     if (request.lock_mode_ == LockMode::SHARED) {
+    //       sharing_count++;
+    //     } else {
+    //       has_wrtiter = true;
+    //     }
+    //   }
+    // }
+    // request_queue.has_writer_ = has_wrtiter;
+    // request_queue.sharing_count_ = sharing_count;
+    WoundWait(request_queue, txn->GetTransactionId());
     request_queue.request_queue_.push_back(new_request);  // 先将请求加入队列
     // 等待队列中没有（老事务的）读锁（这样似乎读者会饿死写者？）, 或者被 aborte
     while ((request_queue.sharing_count_ > 0 || request_queue.has_writer_)) {
@@ -214,29 +225,37 @@ bool LockManager::LockUpgrade(Transaction *txn, const RID &rid) {
     }
   }
   (*itetator_list).granted_ = false;
-  (*itetator_list).lock_mode_ = LockMode::EXCLUSIVE;
   request_queue.upgrading_ = true; // 表示正在锁升级
 
   // wound wait算法 预防死锁
+  bool exixt_writer = false;
   for (auto &request : request_queue.request_queue_) {
     if (request.txn_id_ > txn->GetTransactionId()) {
       // 新事务abort
       if (request.lock_mode_ == LockMode::SHARED) {
         request_queue.sharing_count_--;
-      } else {
-        request_queue.has_writer_ = false;
-      }
+      } 
       request.granted_ = false;
       txnid_to_txnptr_map_[request.txn_id_]->SetState(TransactionState::ABORTED);
+    }else {
+      if (request.lock_mode_ == LockMode::EXCLUSIVE) {
+        // LOG_DEBUG("has wirter, trxid %d is writer",request.txn_id_);
+        
+        exixt_writer = true;
+      }
     }
     request_queue.cv_.notify_all();
   }
+  request_queue.has_writer_ = exixt_writer;
+  // WoundWait(request_queue,txn->GetTransactionId());
+  // std::cout << "lockupgrade : 245 "  << "Rid =" <<rid <<"request_queue.sharing_count_ = " << request_queue.sharing_count_ << std::endl;
   // 等待
-  while (request_queue.has_writer_ || request_queue.sharing_count_ > 0) {
+  while (request_queue.has_writer_ || request_queue.sharing_count_ > 0 ) {
     // 下面的if条件是判断自己是否在等待期间被abort了，如果是就推出循环
     if (txn->GetState() == TransactionState::ABORTED) {
       break;
     }
+    // LOG_DEBUG("lock upgrade wait for ...");
     request_queue.cv_.wait(uniq_lk);
   }
   // 在等待过程中可能被杀死
@@ -246,9 +265,9 @@ bool LockManager::LockUpgrade(Transaction *txn, const RID &rid) {
   }
 
   (*itetator_list).granted_ = true;
+  (*itetator_list).lock_mode_ = LockMode::EXCLUSIVE;
   request_queue.has_writer_ = true;
   request_queue.upgrading_ = false;
-
   txn->GetExclusiveLockSet()->emplace(rid);
   return true;
 }
@@ -291,6 +310,29 @@ bool LockManager::Unlock(Transaction *txn, const RID &rid) {
   return true;
 }
 
+// helper function
+// wound wait 算法：
+void LockManager::WoundWait(LockRequestQueue& request_queue,txn_id_t upcoming_trx_id) {
+    int sharing_count = 0;
+    bool has_wrtiter = false;
+    for (auto &request : request_queue.request_queue_) {
+      if (request.txn_id_ > upcoming_trx_id) {
+        // 新事务abort
+        request.granted_ = false;
+        txnid_to_txnptr_map_[request.txn_id_]->SetState(TransactionState::ABORTED);
+        request_queue.cv_.notify_all();
+      } else {
+        if (request.lock_mode_ == LockMode::SHARED) {
+          sharing_count++;
+        } else {
+          has_wrtiter = true;
+        }
+      }
+    }
+    request_queue.has_writer_ = has_wrtiter;
+    request_queue.sharing_count_ = sharing_count;
+}
+
 void LockManager::AddEdge(txn_id_t t1, txn_id_t t2) {}
 
 void LockManager::RemoveEdge(txn_id_t t1, txn_id_t t2) {}
@@ -310,6 +352,6 @@ void LockManager::RunCycleDetection() {
   }
 }
 
-// helper function
+
 
 }  // namespace bustub

@@ -13,6 +13,7 @@
 #pragma once
 
 #include <atomic>
+#include <iostream>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -92,7 +93,9 @@ class TransactionManager {
     for (auto item : *txn->GetSharedLockSet()) {
       lock_set.emplace(item);
     }
+    // std::cout << txn->GetTransactionId() << " ReleaseAllLocks\n";
     for (auto locked_rid : lock_set) {
+      // std::cout << "Unlock rid = " << locked_rid << "\n";
       lock_manager_->Unlock(txn, locked_rid);
     }
   }

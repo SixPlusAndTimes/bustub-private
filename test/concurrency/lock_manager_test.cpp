@@ -6,6 +6,7 @@
 #include <thread>  // NOLINT
 
 #include "common/config.h"
+#include "common/logger.h"
 #include "concurrency/lock_manager.h"
 #include "concurrency/transaction_manager.h"
 #include "gtest/gtest.h"
@@ -127,6 +128,7 @@ void TwoPLTest() {
 TEST(LockManagerTest, TwoPLTest) { TwoPLTest(); }
 
 void UpgradeTest() {
+  LOG_DEBUG("UpgradeTest()\n");
   LockManager lock_mgr{};
   TransactionManager txn_mgr{&lock_mgr};
   RID rid{0, 0};
@@ -137,8 +139,10 @@ void UpgradeTest() {
   EXPECT_TRUE(res);
   CheckTxnLockSize(&txn, 1, 0);
   CheckGrowing(&txn);
-
+  LOG_DEBUG("before lock upgrade\n");
+  
   res = lock_mgr.LockUpgrade(&txn, rid);
+  LOG_DEBUG("lock upgrade done\n");
   EXPECT_TRUE(res);
   CheckTxnLockSize(&txn, 0, 1);
   CheckGrowing(&txn);

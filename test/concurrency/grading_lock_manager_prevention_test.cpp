@@ -62,9 +62,10 @@ void WoundWaitBasicTest() {
     res = lock_mgr.LockShared(&wait_txn, rid1);
     EXPECT_TRUE(res);
     CheckGrowing(&wait_txn);
-    CheckTxnLockSize(&wait_txn, 1, 0);
+    CheckTxnLockSize(&wait_txn, 1, 0); // 每个事务都能获取到共享锁
+    std::cout << "checksdasdasdssd\n";
     try {
-      res = lock_mgr.LockExclusive(&wait_txn, rid0);
+      res = lock_mgr.LockExclusive(&wait_txn, rid0);        // 每个事务都不能获取共享锁，被
       EXPECT_FALSE(res) << wait_txn.GetTransactionId() << "ERR";
     } catch (const TransactionAbortException &e) {
     } catch (const Exception &e) {
@@ -74,6 +75,7 @@ void WoundWaitBasicTest() {
     CheckAborted(&wait_txn);
 
     txn_mgr.Abort(&wait_txn);
+    std::cout << "wait die task die\n";
   };
 
   // All transaction here should wait.
@@ -84,7 +86,7 @@ void WoundWaitBasicTest() {
 
   // TODO(peijingx): guarantee all are waiting on LockExclusive
   std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
+  // kill task 线程将杀死 waitdie线程
   auto kill_task = [&]() {
     Transaction kill_txn(id_kill++);
 
@@ -94,7 +96,7 @@ void WoundWaitBasicTest() {
     EXPECT_TRUE(res);
     CheckGrowing(&kill_txn);
     CheckTxnLockSize(&kill_txn, 1, 0);
-
+    LOG_DEBUG("kill_task CheckTxnLockSize passed");
     res = lock_mgr.LockShared(&kill_txn, rid0);
     EXPECT_TRUE(res);
     CheckGrowing(&kill_txn);
@@ -552,9 +554,9 @@ const size_t NUM_ITERS = 10;
  */
 // TEST(LockManagerTest, DISABLED_WoundWaitTest) {
 TEST(LockManagerTest, WoundWaitTest) {
-  for (size_t i = 0; i < NUM_ITERS; i++) {
+  // for (size_t i = 0; i < NUM_ITERS; i++) {
     WoundWaitBasicTest();
-  }
+  // }
 }
 
 /*

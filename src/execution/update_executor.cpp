@@ -14,7 +14,7 @@
 
 #include "execution/executors/update_executor.h"
 #include "storage/table/tuple.h"
-
+#include "common/logger.h"
 namespace bustub {
 
 UpdateExecutor::UpdateExecutor(ExecutorContext *exec_ctx, const UpdatePlanNode *plan,
@@ -38,12 +38,12 @@ bool UpdateExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) {
     // 只有REPEATABLE_READ 隔离级别下才会锁升级， 因为 在 uncmiitde 级别下， scan 不会加锁， 在
     // commited下scan在返回前就解锁了
     if (exec_ctx_->GetTransaction()->GetIsolationLevel() == IsolationLevel::REPEATABLE_READ) {
-      // LOG_DEBUG("upgrading lock...,txn id %d, ridpageid = %d, ridslotnum =
-      // %d",exec_ctx_->GetTransaction()->GetTransactionId(),rid->GetPageId(), rid->GetSlotNum());
+      std::cout << "UpdateExecutor::Next LockUpgrading...\n";
+      // LOG_DEBUG("upgrading lock...,txn id %d, ridpageid = %d, ridslotnum =%d",exec_ctx_->GetTransaction()->GetTransactionId(),rid->GetPageId(), rid->GetSlotNum());
       exec_ctx_->GetLockManager()->LockUpgrade(exec_ctx_->GetTransaction(), rid_to_be_updated);
-      // LOG_DEBUG("upgraded txn id %d, ridpageid = %d, ridslotnum =
-      // %d",exec_ctx_->GetTransaction()->GetTransactionId(),rid->GetPageId(), rid->GetSlotNum() ); LOG_DEBUG("upgrading
-      // lock done");
+      // LOG_DEBUG("upgraded txn id %d, ridpageid = %d, ridslotnum = %d",exec_ctx_->GetTransaction()->GetTransactionId(),rid->GetPageId(), rid->GetSlotNum() ); 
+      // LOG_DEBUG("upgrading lock done");
+      std::cout << "UpdateExecutor::Next LockUpgrading done\n";
     } else {
       exec_ctx_->GetLockManager()->LockExclusive(exec_ctx_->GetTransaction(), rid_to_be_updated);
     }
