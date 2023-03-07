@@ -66,18 +66,24 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
     LockRequestQueue &request_queue = lock_table_[rid];
     // LOG_DEBUG("txn_id = %d , lockshared has request_queue", txn->GetTransactionId());
     // wound wait(young wait for old, old kill young)算法 预防死锁, 读锁共存，写读互斥
+    bool exist_writer = false;
     for (auto &request : request_queue.request_queue_) {
       // 检查等待队列中的新事务是否要获取写锁
       if (request.txn_id_ > txn->GetTransactionId() && request.lock_mode_ == LockMode::EXCLUSIVE) {
         // 新事务abort
-        request_queue.has_writer_ = false;
         request.granted_ = false;
         txnid_to_txnptr_map_[request.txn_id_]->SetState(TransactionState::ABORTED);
         // LOG_DEBUG("txn id = %d abored by txn id = %d", request.txn_id_, txn->GetTransactionId());
         // 唤醒被wound wait算法abort的事务
         request_queue.cv_.notify_all();
+      }else {
+        // 如果改事务比本事务老，则判断它是否是读锁
+        if (request.lock_mode_ == LockMode::EXCLUSIVE) {
+          exist_writer = true;
+        }
       }
     }
+    request_queue.has_writer_ = exist_writer;
     request_queue.request_queue_.push_back(new_request);
     // 等待这个RID的请求队列中没有写锁
     while (request_queue.has_writer_ ) {
@@ -134,8 +140,6 @@ bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
     int sharing_count = 0;
     bool has_wrtiter = false;
     for (auto &request : request_queue.request_queue_) {
-      // LOG_DEBUG("exclusive lock wound wait prevnetion, detector txn id = %d, detected txn id = %d",
-      // txn->GetTransactionId(),request.txn_id_);
       if (request.txn_id_ > txn->GetTransactionId()) {
         // 新事务abort
         request.granted_ = false;
@@ -229,14 +233,11 @@ bool LockManager::LockUpgrade(Transaction *txn, const RID &rid) {
   }
   // 等待
   while (request_queue.has_writer_ || request_queue.sharing_count_ > 0) {
-    // LOG_DEBUG("txn id =%d upgrading waiting ", txn->GetTransactionId());
-    // 下面的if条件是判断自己是否被abort了，如果是就推出循环
+    // 下面的if条件是判断自己是否在等待期间被abort了，如果是就推出循环
     if (txn->GetState() == TransactionState::ABORTED) {
       break;
     }
     request_queue.cv_.wait(uniq_lk);
-
-    // LOG_DEBUG("sharing count = %d ,request_queue.has_writer_ ")
   }
   // 在等待过程中可能被杀死
   if (txn->GetState() == TransactionState::ABORTED) {
