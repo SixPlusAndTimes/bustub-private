@@ -133,13 +133,13 @@ class LockManager {
   /** Runs cycle detection in the background. */
   void RunCycleDetection();
 
-  // 自定义函数
 
   // 2PL检测函数
   bool TwoPhaseLockingDetect();
  private:
  // helper functions：
  void WoundWait(LockRequestQueue&,txn_id_t); // 死锁预防算法
+ 
  private:
   // 这个mutex用来保护 LoclRequestQueue
   std::mutex latch_;

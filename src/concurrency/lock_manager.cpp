@@ -37,9 +37,9 @@ namespace bustub {
 
 bool LockManager::LockShared(Transaction *txn, const RID &rid) {
   auto islation_level = txn->GetIsolationLevel();
+  //  read uncomited 隔离级别只需写锁，不需要加读锁
   if (islation_level == IsolationLevel::READ_UNCOMMITTED) {
     txn->SetState(TransactionState::ABORTED);
-    //  read uncomited 隔离级别只需写锁，不需要加读锁
     return false;
   }
   // 强两阶段锁判定，必须在growing阶段才能加锁，否则事务Abort
@@ -59,7 +59,6 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
     //   2. 但是这里的unordered_map的alue中有一个LockRequestQueue内含条件变量，它不能被拷贝也不能被移动，必须在原地构造出来，因此传入了piecewise_construct参数
     //   3. 下面的创建语法就是说rid作为key， 而value则是原地构建出来的。 
     // 详见https://www.cnblogs.com/guxuanqing/p/11396511.html
-    // 创建LockRequestQueue
     lock_table_.emplace(std::piecewise_construct, std::forward_as_tuple(rid), std::forward_as_tuple());
     // 在新创建的requestqueue添加新的 request
     new_request.granted_ = true;
@@ -103,7 +102,7 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
       request_queue.cv_.wait(uniq_lk);
     }
 
-    // 遍历request_list , 将先前加入的request 的granted字段改称true；
+    // 遍历request_list
     std::list<LockRequest>::iterator itetator_list;
     for (itetator_list = request_queue.request_queue_.begin(); itetator_list != request_queue.request_queue_.end();
          ++itetator_list) {
@@ -116,12 +115,11 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
       request_queue.request_queue_.erase(itetator_list);
       return false;
     }
+    // 获得了锁
     (*itetator_list).granted_ = true;
     request_queue.sharing_count_++;
-
-    // std::cout <<  static_cast<int>(itetator_list->lock_mode_)  << std::endl;
   }
-  // 这个事务获得了读锁
+  // 将获得锁的记录存放在事务对象中
   txn->GetSharedLockSet()->emplace(rid);
   
   return true;
@@ -147,26 +145,7 @@ bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
     lock_table_[rid].has_writer_ = true;
   } else {
     LockRequestQueue &request_queue = lock_table_[rid];
-    // wound wait算法 预防死锁
-    // int sharing_count = 0;
-    // bool has_wrtiter = false;
-    // for (auto &request : request_queue.request_queue_) {
-    //   if (request.txn_id_ > txn->GetTransactionId()) {
-    //     // 新事务abort
-    //     request.granted_ = false;
-    //     txnid_to_txnptr_map_[request.txn_id_]->SetState(TransactionState::ABORTED);
-    //     // LOG_DEBUG("txn id = %d  kill txn = %d", txn->GetTransactionId(), request.txn_id_);
-    //     request_queue.cv_.notify_all();
-    //   } else {
-    //     if (request.lock_mode_ == LockMode::SHARED) {
-    //       sharing_count++;
-    //     } else {
-    //       has_wrtiter = true;
-    //     }
-    //   }
-    // }
-    // request_queue.has_writer_ = has_wrtiter;
-    // request_queue.sharing_count_ = sharing_count;
+
     WoundWait(request_queue, txn->GetTransactionId());
     request_queue.request_queue_.push_back(new_request);  // 先将请求加入队列
     // 等待队列中没有（老事务的）读锁（这样似乎读者会饿死写者？）, 或者被 aborte
@@ -191,7 +170,7 @@ bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
       request_queue.request_queue_.erase(itetator_list);
       return false;
     }
-    // LOG_DEBUG("txn id = %d, get lock", txn->GetTransactionId());
+
     (*itetator_list).granted_ = true;
     request_queue.has_writer_ = true;
   }
@@ -202,7 +181,6 @@ bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
 
 bool LockManager::LockUpgrade(Transaction *txn, const RID &rid) {
   // 两阶段锁判定， 在加锁阶段事物状态必须是 GROWING
-  // islation_level == IsolationLevel::REPEATABLE_READ 这个条件不加好像也可以
   if (txn->GetIsolationLevel() == IsolationLevel::REPEATABLE_READ && txn->GetState() != TransactionState::GROWING) {
     txn->SetState(TransactionState::ABORTED);
     return false;
