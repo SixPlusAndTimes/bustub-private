@@ -228,12 +228,10 @@ bool LockManager::LockUpgrade(Transaction *txn, const RID &rid) {
     request_queue.cv_.notify_all();
   }
   // 等待
-  while ((request_queue.has_writer_ && request_queue.sharing_count_ > 0) ||
-         txn->GetState() != TransactionState::ABORTED) {
+  while (request_queue.has_writer_ || request_queue.sharing_count_ > 0) {
     // LOG_DEBUG("txn id =%d upgrading waiting ", txn->GetTransactionId());
     // 下面的if条件是判断自己是否被abort了，如果是就推出循环
-    if (txn->GetState() != TransactionState::ABORTED &&
-        (request_queue.sharing_count_ == 0 && !request_queue.has_writer_)) {
+    if (txn->GetState() == TransactionState::ABORTED) {
       break;
     }
     request_queue.cv_.wait(uniq_lk);
