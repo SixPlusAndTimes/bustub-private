@@ -19,6 +19,7 @@
 #include <tuple>
 #include <utility>
 #include <vector>
+#include "common/config.h"
 #include "common/logger.h"
 #include "concurrency/transaction.h"
 #include "storage/table/table_iterator.h"
@@ -98,18 +99,11 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
       if (txn->GetState() == TransactionState::ABORTED) {
         break;
       }
-      // LOG_DEBUG("txnid = %d sharelock waiting",txn->GetTransactionId());
       request_queue.cv_.wait(uniq_lk);
     }
 
     // 遍历request_list
-    std::list<LockRequest>::iterator itetator_list;
-    for (itetator_list = request_queue.request_queue_.begin(); itetator_list != request_queue.request_queue_.end();
-         ++itetator_list) {
-      if ((*itetator_list).txn_id_ == txn->GetTransactionId()) {
-        break;
-      }
-    }
+    std::list<LockRequest>::iterator itetator_list = GetIterator(request_queue,txn->GetTransactionId());
     // 本事务在等待过程中可能被abort
     if (txn->GetState() == TransactionState::ABORTED) {
       request_queue.request_queue_.erase(itetator_list);
@@ -158,13 +152,7 @@ bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
       request_queue.cv_.wait(uniq_lk);
     }
 
-    std::list<LockRequest>::iterator itetator_list;
-    for (itetator_list = request_queue.request_queue_.begin(); itetator_list != request_queue.request_queue_.end();
-         ++itetator_list) {
-      if ((*itetator_list).txn_id_ == txn->GetTransactionId()) {
-        break;
-      }
-    }
+    std::list<LockRequest>::iterator itetator_list = GetIterator(request_queue, txn->GetTransactionId());
     // 在等待过程中可能被杀死
     if (txn->GetState() == TransactionState::ABORTED) {
       request_queue.request_queue_.erase(itetator_list);
@@ -194,17 +182,10 @@ bool LockManager::LockUpgrade(Transaction *txn, const RID &rid) {
   }
   txn->GetSharedLockSet()->erase(rid);
   request_queue.sharing_count_--;
-  // std::cout << "request_queue.sharing_count_" << request_queue.sharing_count_ <<std::endl;
-  std::list<LockRequest>::iterator itetator_list;
-  for (itetator_list = request_queue.request_queue_.begin(); itetator_list != request_queue.request_queue_.end();
-       ++itetator_list) {
-    if ((*itetator_list).txn_id_ == txn->GetTransactionId()) {
-      break;
-    }
-  }
+
+  std::list<LockRequest>::iterator itetator_list = GetIterator(request_queue, txn->GetTransactionId());
   (*itetator_list).granted_ = false;
   request_queue.upgrading_ = true; // 表示正在锁升级
-
   // wound wait算法 预防死锁
   bool exixt_writer = false;
   for (auto &request : request_queue.request_queue_) {
@@ -216,24 +197,19 @@ bool LockManager::LockUpgrade(Transaction *txn, const RID &rid) {
       request.granted_ = false;
       txnid_to_txnptr_map_[request.txn_id_]->SetState(TransactionState::ABORTED);
     }else {
-      if (request.lock_mode_ == LockMode::EXCLUSIVE) {
-        // LOG_DEBUG("has wirter, trxid %d is writer",request.txn_id_);
-        
+      if (request.lock_mode_ == LockMode::EXCLUSIVE) {        
         exixt_writer = true;
       }
     }
     request_queue.cv_.notify_all();
   }
   request_queue.has_writer_ = exixt_writer;
-  // WoundWait(request_queue,txn->GetTransactionId());
-  // std::cout << "lockupgrade : 245 "  << "Rid =" <<rid <<"request_queue.sharing_count_ = " << request_queue.sharing_count_ << std::endl;
   // 等待
   while (request_queue.has_writer_ || request_queue.sharing_count_ > 0 ) {
     // 下面的if条件是判断自己是否在等待期间被abort了，如果是就推出循环
     if (txn->GetState() == TransactionState::ABORTED) {
       break;
     }
-    // LOG_DEBUG("lock upgrade wait for ...");
     request_queue.cv_.wait(uniq_lk);
   }
   // 在等待过程中可能被杀死
@@ -262,18 +238,14 @@ bool LockManager::Unlock(Transaction *txn, const RID &rid) {
   }
   // 找到这个事务对应的 LockRequest
   LockRequestQueue &request_queue = lock_table_[rid];
-  std::list<LockRequest>::iterator itetator_list;
-  for (itetator_list = request_queue.request_queue_.begin(); itetator_list != request_queue.request_queue_.end();
-       ++itetator_list) {
-    if ((*itetator_list).txn_id_ == txn_id) {
-      break;
-    }
-  }
+  std::list<LockRequest>::iterator itetator_list = GetIterator(request_queue, txn_id);
+
   auto lock_mode = (*itetator_list).lock_mode_;  // 获取lockmode后在list中删除这个LcokRequest
   if (itetator_list != request_queue.request_queue_.end()) {
     request_queue.request_queue_.erase(itetator_list);
   }
 
+  /*唤醒其他可能的请求*/
   if (lock_mode == LockMode::SHARED) {
     request_queue.sharing_count_--;
     if (request_queue.sharing_count_ == 0) {
@@ -309,6 +281,17 @@ void LockManager::WoundWait(LockRequestQueue& request_queue,txn_id_t upcoming_tr
     }
     request_queue.has_writer_ = has_wrtiter;
     request_queue.sharing_count_ = sharing_count;
+}
+// 遍历requestqueue获得相应的迭代其
+std::list<LockManager::LockRequest>::iterator LockManager::GetIterator(LockRequestQueue& request_queue,txn_id_t txn_id ){
+  std::list<LockRequest>::iterator itetator_list;
+  for (itetator_list = request_queue.request_queue_.begin(); itetator_list != request_queue.request_queue_.end();
+       ++itetator_list) {
+    if ((*itetator_list).txn_id_ == txn_id) {
+      break;
+    }
+  }
+  return itetator_list;
 }
 
 void LockManager::AddEdge(txn_id_t t1, txn_id_t t2) {}

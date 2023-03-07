@@ -139,7 +139,7 @@ class LockManager {
  private:
  // helper functions：
  void WoundWait(LockRequestQueue&,txn_id_t); // 死锁预防算法
- 
+ std::list<LockRequest>::iterator GetIterator(LockRequestQueue&, txn_id_t);
  private:
   // 这个mutex用来保护 LoclRequestQueue
   std::mutex latch_;
