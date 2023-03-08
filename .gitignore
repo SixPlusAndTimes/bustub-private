@@ -261,3 +261,6 @@ docs/dev
 
 # Vagrant
 .vagrant
+
+# homework zip package
+*.zip

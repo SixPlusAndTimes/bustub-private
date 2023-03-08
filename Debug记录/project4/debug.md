@@ -1,4 +1,4 @@
-这个project的bug大部分是并发条件， 由于之前没有正经的并发编程经验，所以debug起来依然很痛苦。
+这个project的bug大部分是并发条件， 由于之前没有正经的并发编程经验，所以debug起来依然很痛苦。但是好在测试代码的并发度不高(测试代码中会使用sleep函数故意使线程睡眠几秒)， 可以直接使用cout\LOG_DEBUG调试。
 
 我觉得project4的难度比project3大些， 但是projet3的代码量大，所以反而project3的完成时间要多些。
 
@@ -27,3 +27,21 @@
 - insert : 似乎没有要求 ?
   
 > 虽然官网提示我们要更新索引的writeset,但是测试代码中没有对索引进行检查.
+
+> 花费时间最长的是关于Reapeatable Read相关的测试
+
+测试代码会这样测试你是否正确实现了Reapeatable Read隔离级别：
+- 开启两个thread，记为thread1，thread2
+- thread1 执行两次Selcet操作，两次查询的数据的RID相同
+- thread2 执行一次Update操作，修改的数据与thread1的数据的RID相同
+- 测试代码使用sleep操作保证调度顺序一定为：
+  - thread1第一次select -> thread2 update相同数据 -> thread1第二次select
+- 如果正确实现了Repeatable隔离级别，那么thread1的第二次select结果与第一次的结果相同
+- 这里的关键就是使得thread2在执行update时被挂起。
+- UpdateExecutor有一个seqscan子Executor，子执行器已经对数据上了读锁，且由于隔离级别为Reapeatable Read，因此子执行其上的读锁不会归还直到事务结束。这时主执行器，在对记录进行update时就要使用LockUpdate方法了
+- 因此LockUpdate方法一定要确保在这种调度顺序下，thread2会在条件变量上等待，等待改RID的读锁和写锁数量为0。
+
+>具体如何调试？
+说来惭愧，本人不是很会用GDB，且这个实验的并发读不高，所以一直使用控制台在调试 ：）。主要观察thread2 的update方法是否在thread1 commit事务前结束执行。如果是的话，就打印更加详细的LOG，把等待队列的has_writer、readcount、是否陷入等待、是否执行唤醒操作、wound-wait算法是否正确abort了新事务等等，都打印出来，一个一个排查。
+
+易错： 当一个事务被wakeup时，并不代表它获取了锁，有可能它作为一个老事务被新事物abort了，因此一定要检查这种情况！

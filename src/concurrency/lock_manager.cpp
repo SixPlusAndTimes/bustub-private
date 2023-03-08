@@ -34,7 +34,9 @@ namespace bustub {
 // 使用严格二阶段锁，在growing阶段只能获取锁，在shring阶段只能释放锁，而且所有的锁都在commit时才释放 isolation =
 // SERIALIZABLE ： 本lab不要求，理论上需要 strict 2PL + index locks
 
-// 读写锁立即释放还是在commit时释放，不由lock_manager决定，而是由各executor决定
+// 上面所说的所有操作，上锁是否成功由lock_manager管理，
+// 而锁的释放时间（是在commit时由transaction——manager统一释放才释放，还是读\写完就立刻释放）由各executor选择
+// 最终事务commit时，不管是哪个隔离级别，transaction_manager释放所有还未释放的锁。
 
 bool LockManager::LockShared(Transaction *txn, const RID &rid) {
   auto islation_level = txn->GetIsolationLevel();
@@ -43,7 +45,7 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
     txn->SetState(TransactionState::ABORTED);
     return false;
   }
-  // 强两阶段锁判定，必须在growing阶段才能加锁，否则事务Abort
+  // 强两阶段锁判定，只有当隔离级别为REPEATABLE_READ时才要求强两阶段锁。必须在growing阶段才能加锁，否则事务Abort
   if (islation_level == IsolationLevel::REPEATABLE_READ && txn->GetState() != TransactionState::GROWING) {
     txn->SetState(TransactionState::ABORTED);
     return false;
@@ -67,7 +69,6 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
     lock_table_[rid].sharing_count_++;
   } else {
     LockRequestQueue &request_queue = lock_table_[rid];
-    // LOG_DEBUG("txn_id = %d , lockshared has request_queue", txn->GetTransactionId());
     // wound wait(young wait for old, old kill young)算法 预防死锁, 读锁共存，写读互斥
     bool exist_writer = false;
     for (auto &request : request_queue.request_queue_) {
@@ -84,15 +85,16 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
         if (request.lock_mode_ == LockMode::EXCLUSIVE) {
           exist_writer = true;
         }
-      }else if(request.txn_id_ ==txn->GetTransactionId()){
+      }else if(request.txn_id_ ==txn->GetTransactionId()){ // 同一个事务申请同一个读锁
         if (request.granted_) 
-        { 
+        { // 如果已经赋予了这个事务读锁，则啥都不做
           return true;
         }
       }
     }
     request_queue.has_writer_ = exist_writer;
     request_queue.request_queue_.push_back(new_request);
+
     // 等待这个RID的请求队列中没有写锁
     while (request_queue.has_writer_ ) {
       // 如果 被abort 或者 并发条件满足则break
@@ -109,7 +111,7 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
       request_queue.request_queue_.erase(itetator_list);
       return false;
     }
-    // 获得了锁
+    // 本事务获得了锁
     (*itetator_list).granted_ = true;
     request_queue.sharing_count_++;
   }
@@ -126,20 +128,20 @@ bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
     txn->SetState(TransactionState::ABORTED);
     return false;
   }
-
+  // 获取等待队列的锁
   std::unique_lock<std::mutex> uniq_lk(latch_);
 
   txnid_to_txnptr_map_.emplace(txn->GetTransactionId(), txn);
 
   LockRequest new_request(txn->GetTransactionId(), LockMode::EXCLUSIVE);
-
   if (lock_table_.count(rid) == 0) {
     lock_table_.emplace(std::piecewise_construct, std::forward_as_tuple(rid), std::forward_as_tuple());
     lock_table_[rid].request_queue_.push_back(new_request);
     lock_table_[rid].has_writer_ = true;
   } else {
     LockRequestQueue &request_queue = lock_table_[rid];
-
+    // WoundWait算法，本想将三个方法的WoundWait算法整合成1个
+    // 但是我越改越繁琐了。。。
     WoundWait(request_queue, txn->GetTransactionId());
     request_queue.request_queue_.push_back(new_request);  // 先将请求加入队列
     // 等待队列中没有（老事务的）读锁（这样似乎读者会饿死写者？）, 或者被 aborte
@@ -282,7 +284,7 @@ void LockManager::WoundWait(LockRequestQueue& request_queue,txn_id_t upcoming_tr
     request_queue.has_writer_ = has_wrtiter;
     request_queue.sharing_count_ = sharing_count;
 }
-// 遍历requestqueue获得相应的迭代其
+// 遍历requestqueue获得相应的迭代器
 std::list<LockManager::LockRequest>::iterator LockManager::GetIterator(LockRequestQueue& request_queue,txn_id_t txn_id ){
   std::list<LockRequest>::iterator itetator_list;
   for (itetator_list = request_queue.request_queue_.begin(); itetator_list != request_queue.request_queue_.end();

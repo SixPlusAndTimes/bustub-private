@@ -33,7 +33,7 @@ make test_name
 # 自我评价
 写得很烂，尤其是lab2和lab4，前者是耗时长，可能算法逻辑并不是最优；后者则是代码结构很烂， 对条件变量以及锁的处理看着就非常业余。lab的思路几乎没有一个能自己想出来，都是参考别人博客磕磕绊绊写的。
 
-这是本人尝试写完的第一个lab，感觉很有难度。但收获量多，尤其是C++的使用以及关系型数据库的原理。
+这是本人尝试写完的第一个lab，感觉很有难度。但收获颇多，尤其是C++的使用以及关系型数据库的原理。
 # 后续计划
 - 试着在C++语法层面对代码进行优化，尤其是在C++11的使用方面
 - 调整代码结构，使其更精简
@@ -43,15 +43,21 @@ make test_name
 
 执行测试程序10次，计算其平均执行时间，shell脚本在build目录下
 初始：
-lru_replacer_test : 0.227秒
 
-buffer_pool_manager_instance_test  2.999
+| lru_replacer_test| buffer_pool_manager_instance_test|parallel_buffer_pool_manager_test|
+|---|---|---|
+| 0.227| 2.999|3.116 |
 
-parallel_buffer_pool_manager_test  3.116
-
-主要关于unordered_map的使用方面的优化：
-                    0.229
-                    2.929
-                    3.026
-
+主要关于unordered_map的使用方面的优化,以及引用传值(for循环内)，迭代器使用(使用前置++)
+| lru_replacer_test| buffer_pool_manager_instance_test|parallel_buffer_pool_manager_test|
+|---|---|---|
+| 0.229| 2.929|3.026|
+              
 感觉没啥优化的样子
+
+# 优化lab4
+可算把各个lock方法的while等待条件给想清楚了，顺眼了不少
+
+把一些重复代码封装了起来
+
+本来想把三个lock方法的woundwait算法封装在一个方法里的，但是越改越来丑了:)，改了这里，这个测试代码没过，改了那里，那个测试代码没过。。。
