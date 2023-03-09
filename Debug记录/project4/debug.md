@@ -39,9 +39,9 @@
 - 如果正确实现了Repeatable隔离级别，那么thread1的第二次select结果与第一次的结果相同
 - 这里的关键就是使得thread2在执行update时被挂起。
 - UpdateExecutor有一个seqscan子Executor，子执行器已经对数据上了读锁，且由于隔离级别为Reapeatable Read，因此子执行其上的读锁不会归还直到事务结束。这时主执行器，在对记录进行update时就要使用LockUpdate方法了
-- 因此LockUpdate方法一定要确保在这种调度顺序下，thread2会在条件变量上等待，等待改RID的读锁和写锁数量为0。
+- 因此LockUpdate方法一定要确保在这种调度顺序下，thread2会在条件变量上等待，等待g该RID的读锁和写锁数量为0。
 
 >具体如何调试？
 说来惭愧，本人不是很会用GDB，且这个实验的并发读不高，所以一直使用控制台在调试 ：）。主要观察thread2 的update方法是否在thread1 commit事务前结束执行。如果是的话，就打印更加详细的LOG，把等待队列的has_writer、readcount、是否陷入等待、是否执行唤醒操作、wound-wait算法是否正确abort了新事务等等，都打印出来，一个一个排查。
 
-易错： 当一个事务被wakeup时，并不代表它获取了锁，有可能它作为一个老事务被新事物abort了，因此一定要检查这种情况！
+**易错： 当一个事务被wakeup时，并不代表它获取了锁，有可能它作为一个老事务被新事物abort了，因此一定要检查这种情况！**
