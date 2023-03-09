@@ -63,7 +63,7 @@ TableIterator &TableIterator::operator++() {
   buffer_pool_manager->UnpinPage(cur_page->GetTablePageId(), false);
   return *this;
 }
-// 后置自增运算符重载
+// 后置自增运算符重载， 有一个临时对象
 TableIterator TableIterator::operator++(int) {
   TableIterator clone(*this);
   ++(*this);

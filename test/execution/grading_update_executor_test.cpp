@@ -118,7 +118,6 @@ TEST_F(GradingExecutorTest, UpdateTableSet) {
 
   // Execute an initial sequential scan, ensure all expected tuples are present
   GetExecutionEngine()->Execute(scan_plan.get(), &result_set, GetTxn(), GetExecutorContext());
-
   // Verify results
   ASSERT_EQ(result_set.size(), TEST3_SIZE);
 
@@ -343,13 +342,12 @@ TEST_F(GradingExecutorTest, UpdateIntegrated) {
 }
 
 // Sequential add updates with N transactions
-TEST_F(GradingExecutorTest, DISABLED_SequentialUpdateAdd) {
+TEST_F(GradingExecutorTest, SequentialUpdateAdd) {
   constexpr const auto n_tasks = 10UL;
-
   // construct a sequential scan of the table
   auto *table_info = GetExecutorContext()->GetCatalog()->GetTable("test_3");
   auto &schema = table_info->schema_;
-  auto col_a = MakeColumnValueExpression(schema, 0, "col_a");
+  auto col_a = MakeColumnValueExpression(schema, 0, "colA");
   auto col_b = MakeColumnValueExpression(schema, 0, "colB");
   auto *out_schema = MakeOutputSchema({{"colA", col_a}, {"colB", col_b}});
   SeqScanPlanNode scan_plan{out_schema, nullptr, table_info->oid_};
@@ -361,7 +359,6 @@ TEST_F(GradingExecutorTest, DISABLED_SequentialUpdateAdd) {
   std::vector<Tuple> scan_results{};
   GetExecutionEngine()->Execute(&scan_plan, &scan_results, scan_txn1.get(), exec_ctx1.get());
   GetTxnManager()->Commit(scan_txn1.get());
-
   // Verify results
   ASSERT_EQ(scan_results.size(), TEST3_SIZE);
   for (auto i = 0UL; i < scan_results.size(); ++i) {

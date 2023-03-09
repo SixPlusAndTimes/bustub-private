@@ -158,7 +158,7 @@ TEST_F(GradingExecutorTest, SchemaChangeSequentialScan) {
 
 // SELECT colA FROM test_4
 // READ_UNCOMMITTED isolation level
-TEST_F(GradingExecutorTest, DISABLED_ConcurrentScanReadUncommitted) {
+TEST_F(GradingExecutorTest, ConcurrentScanReadUncommitted) {
   constexpr const auto n_tasks = 10UL;
   auto task = [&]() {
     // make a new transaction for the task to run
@@ -201,7 +201,7 @@ TEST_F(GradingExecutorTest, DISABLED_ConcurrentScanReadUncommitted) {
 
 // SELECT colA FROM test_4
 // READ_COMMITTED isolation level
-TEST_F(GradingExecutorTest, DISABLED_ConcurrentScanReadCommitted) {
+TEST_F(GradingExecutorTest, ConcurrentScanReadCommitted) {
   constexpr const auto n_tasks = 10UL;
   auto task = [&]() {
     // make a new transaction for the task to run
@@ -244,7 +244,7 @@ TEST_F(GradingExecutorTest, DISABLED_ConcurrentScanReadCommitted) {
 
 // SELECT colA FROM test_4
 // REPEATABLE_READ isolation level
-TEST_F(GradingExecutorTest, DISABLED_ConcurrentScanRepeatableRead) {
+TEST_F(GradingExecutorTest,ConcurrentScanRepeatableRead) {
   constexpr const auto n_tasks = 10UL;
   auto task = [&]() {
     // make a new transaction for the task to run

@@ -41,9 +41,7 @@ void SeqScanExecutor::Init() {
 
 // 注意 ： NEXT输出的元组并不等于表元组，它是没有RID的； 其RID只能从对应的表元组中得到
 bool SeqScanExecutor::Next(Tuple *tuple, RID *rid) {
-  bool successed = false;
   while (tableheap_iterator_ != table_info_->table_->End()) {
-    // &(*tableheap_iterator_) : 对迭代器解引用得到 Tuple& , 再对Tuple取地址得到 Tuple *
 
     //除了 READ_UNCOMMITER 隔离级别，其他级别都需要加读锁
     if (exec_ctx_->GetTransaction()->GetIsolationLevel() != IsolationLevel::READ_UNCOMMITTED) {
@@ -62,33 +60,34 @@ bool SeqScanExecutor::Next(Tuple *tuple, RID *rid) {
       continue;
     }
 
+    // 构造ValueVector以创建Tuple
     std::vector<Value> values;
-    values.reserve(output_shema_->GetColumnCount());
+    // values.reserve(output_shema_->GetColumnCount());
     for (uint32_t i = 0; i < output_shema_->GetColumnCount(); i++) {
       // 注意 ： 这里的Evaluate方法输入的schema参数是锁扫描表的shema，而不是outputschema，否则会访问非法内存！
       Value value = output_shema_->GetColumn(i).GetExpr()->Evaluate(&(*tableheap_iterator_), &table_info_->schema_);
       values.push_back(value);
     }
-    successed = true;
-    // 创建Tuple并将其复制到tuple指向的地址
 
+    // 创建Tuple并传出
     /** 下面的new 操作会在堆内存中申请空间，但是没有对应的析构函数
      tuple = new Tuple(values, output_shema_); 这一行有两个错误，1是没有析构Tuple
     ,2是没有在给定的地址创建，请见execution.h中的执行代码。 new(tuple)Tuple(values, output_shema_);
     这一行也错，错在在堆上分配对象
     **/
+    // 必须使用copy assignment进行赋值
     *tuple = Tuple(values, output_shema_);
-
     // *rid = tuple->GetRid();  错误，输出元组是没有RID这个说法的
     *rid = tableheap_iterator_->GetRid();  // 只能从表元组中得到对应的RID
+    
     // 如果隔离等级为read_commited 则读完立刻释放锁
     if (exec_ctx_->GetTransaction()->GetIsolationLevel() == IsolationLevel::READ_COMMITTED) {
       exec_ctx_->GetLockManager()->Unlock(exec_ctx_->GetTransaction(), tableheap_iterator_->GetRid());
     }
     ++tableheap_iterator_;
-    return successed;
+    return true;
   }
-  return successed;
+  return false;
 }
 
 }  // namespace bustub

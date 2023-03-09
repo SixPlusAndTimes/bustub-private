@@ -41,7 +41,8 @@ make test_name
 
 # 优化lab1
 
-执行测试程序10次，计算其平均执行时间，shell脚本在build目录下
+执行测试程序10次，计算其平均执行时间，shell脚本(testTime.sh)在build目录下。提一嘴，我完全不懂shell编程，是让ChatGPT生成的，还真不错 :)
+
 初始：
 
 | lru_replacer_test| buffer_pool_manager_instance_test|parallel_buffer_pool_manager_test|
@@ -54,6 +55,13 @@ make test_name
 | 0.229| 2.929|3.026|
               
 感觉没啥优化的样子
+# 优化lab3
+这次就一次性测试取全部的测试代码吧, 运行15次取平均值
+~~~shell
+./testTime.sh ./TestAll
+....
+平均运行时间为：4.478
+~~~
 
 # 优化lab4
 可算把各个lock方法的while等待条件给想清楚了，顺眼了不少

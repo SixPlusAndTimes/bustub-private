@@ -89,6 +89,7 @@ using HashFunctionType = HashFunction<KeyType>;
 // SELECT col_a, col_b FROM test_1 WHERE col_a < 500
 TEST_F(ExecutorTest, SimpleSeqScanTest) {
   // Construct query plan
+  // 在本测试执行之前已经创建好测试表了，executor_test_util.h中的ExecutorTest::SetUp()
   TableInfo *table_info = GetExecutorContext()->GetCatalog()->GetTable("test_1");
   const Schema &schema = table_info->schema_;
   auto *col_a = MakeColumnValueExpression(schema, 0, "colA");

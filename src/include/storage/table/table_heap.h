@@ -21,6 +21,7 @@
 namespace bustub {
 
 /**
+ * 磁盘上的物理形式，以双向链表的形式链接
  * TableHeap represents a physical table on disk.
  * This is just a doubly-linked list of pages.
  */
