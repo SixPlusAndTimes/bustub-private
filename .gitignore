@@ -264,3 +264,7 @@ docs/dev
 
 # homework zip package
 *.zip
+
+.cache/
+.github/
+.circleci/
