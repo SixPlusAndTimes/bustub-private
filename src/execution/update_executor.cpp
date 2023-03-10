@@ -35,16 +35,11 @@ bool UpdateExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) {
   get_tuple_succeed = child_executor_->Next(&tuple_to_be_updated, &rid_to_be_updated);
 
   if (get_tuple_succeed) {
-    // 只有REPEATABLE_READ 隔离级别下才会锁升级， 因为 在 uncmiitde 级别下， scan 不会加锁， 在
-    // commited下scan在返回前就解锁了
+    // 只有REPEATABLE_READ 隔离级别下才会锁升级，因为只有在这个级别下，读锁不会释放直到事务commit
     if (exec_ctx_->GetTransaction()->GetIsolationLevel() == IsolationLevel::REPEATABLE_READ) {
-      // std::cout << "UpdateExecutor::Next LockUpgrading...\n";
-      // LOG_DEBUG("upgrading lock...,txn id %d, ridpageid = %d, ridslotnum =%d",exec_ctx_->GetTransaction()->GetTransactionId(),rid->GetPageId(), rid->GetSlotNum());
       exec_ctx_->GetLockManager()->LockUpgrade(exec_ctx_->GetTransaction(), rid_to_be_updated);
-      // LOG_DEBUG("upgraded txn id %d, ridpageid = %d, ridslotnum = %d",exec_ctx_->GetTransaction()->GetTransactionId(),rid->GetPageId(), rid->GetSlotNum() ); 
-      // LOG_DEBUG("upgrading lock done");
-      // std::cout << "UpdateExecutor::Next LockUpgrading done\n";
     } else {
+      // 其他隔离级别下直接加写锁
       exec_ctx_->GetLockManager()->LockExclusive(exec_ctx_->GetTransaction(), rid_to_be_updated);
     }
     Tuple updated_tuple = GenerateUpdatedTuple(tuple_to_be_updated);  // 生成新的tuple

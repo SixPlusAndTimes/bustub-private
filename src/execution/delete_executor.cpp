@@ -21,7 +21,7 @@
 #include "storage/table/tuple.h"
 
 namespace bustub {
-// delete plan 之多只有一个子节点
+// 要删除的tuple总是来自于seqscan子执行器，将对应的rid的tuple， `Mark delete `就行了
 DeleteExecutor::DeleteExecutor(ExecutorContext *exec_ctx, const DeletePlanNode *plan,
                                std::unique_ptr<AbstractExecutor> &&child_executor)
     : AbstractExecutor(exec_ctx), plan_(plan), child_executor_(std::move(child_executor)) {
@@ -36,18 +36,13 @@ bool DeleteExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) {
   Tuple tuple_to_be_delete;
   RID rid_to_be_delete;
   bool get_rid_successed = child_executor_->Next(&tuple_to_be_delete, &rid_to_be_delete);
-  // 只有REPEATABLE_READ 隔离级别下才会锁升级， 因为 在 uncmiitde 级别下， scan 不会加锁， 在
-  // commited下scan在返回前就解锁了
+  // 只有REPEATABLE_READ 隔离级别下才会锁升级
   if (get_rid_successed && exec_ctx_->GetTransaction()->GetIsolationLevel() == IsolationLevel::REPEATABLE_READ) {
-    // LOG_DEBUG("upgrading lock...,txn id %d, ridpageid = %d, ridslotnum =
-    // %d",exec_ctx_->GetTransaction()->GetTransactionId(),rid_to_be_delete.GetPageId(), rid_to_be_delete.GetSlotNum());
     exec_ctx_->GetLockManager()->LockUpgrade(exec_ctx_->GetTransaction(), rid_to_be_delete);
-    // LOG_DEBUG("upgraded txn id %d, ridpageid = %d, ridslotnum =
-    // %d",exec_ctx_->GetTransaction()->GetTransactionId(),rid->GetPageId(), rid->GetSlotNum() ); LOG_DEBUG("upgrading
-    // lock done");
   } else {
     exec_ctx_->GetLockManager()->LockExclusive(exec_ctx_->GetTransaction(), rid_to_be_delete);
   }
+  
   if (get_rid_successed) {
     bool tuple_deleted = table_info_->table_->MarkDelete(rid_to_be_delete, exec_ctx_->GetTransaction());
     if (tuple_deleted) {

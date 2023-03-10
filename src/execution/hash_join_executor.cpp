@@ -42,6 +42,7 @@ void HashJoinExecutor::Init() {
   Value left_join_value;
   JoinKey left_join_key;
   const Schema *left_schema = left_executor_->GetOutputSchema();
+  // 优化点： find 和 count的使用，std::move, 中间变量完全可以不要， hashmap的chain为什么用vector不用list？
   while (left_executor_->Next(&left_tuple, &left_rid)) {
     left_join_value = plan_->LeftJoinKeyExpression()->Evaluate(&left_tuple, left_schema);
     left_join_key = {left_join_value};
@@ -73,6 +74,7 @@ bool HashJoinExecutor::Next(Tuple *tuple, RID *rid) {
   Value right_join_value;
   JoinKey right_join_key;
   const Schema *right_schema = right_executor_->GetOutputSchema();
+  // 优化点： 中间变量完全可以不要
   right_join_value = plan_->RightJoinKeyExpression()->Evaluate(&right_tuple_, right_schema);
   right_join_key = {right_join_value};
   while (join_map_.count(right_join_key) == 0 || vector_probe_done_) {
@@ -87,11 +89,12 @@ bool HashJoinExecutor::Next(Tuple *tuple, RID *rid) {
     probe_pos_ = 0;
     vector_probe_done_ = false;
   }
-
+  // 优化点，使用引用
   auto tuple_vector = join_map_[right_join_key];
   auto tuple_vector_size = tuple_vector.size();
 
-  assert(probe_pos_ < tuple_vector_size);
+  // 到这里，探测游标一定是小于数组大小的。
+  assert(probe_pos_ < tuple_vector_size); 
 
   auto left_tuple_in_map = tuple_vector[probe_pos_];
   probe_pos_++;
@@ -100,16 +103,16 @@ bool HashJoinExecutor::Next(Tuple *tuple, RID *rid) {
   }
 
   // 组装连接后的tuple
-
   auto out_schema = plan_->OutputSchema();
   auto left_schema = left_executor_->GetOutputSchema();
   // auto right_schema = right_executor_->GetOutputSchema();
 
   auto colunms = out_schema->GetColumns();
   std::vector<Value> out_values;
+  // 优化点：， reserve 和 push back ？
   out_values.reserve(colunms.size());
   for (const auto &col : colunms) {
-    out_values.emplace_back(col.GetExpr()->EvaluateJoin(&left_tuple_in_map, left_schema, &right_tuple_, right_schema));
+    out_values.push_back(col.GetExpr()->EvaluateJoin(&left_tuple_in_map, left_schema, &right_tuple_, right_schema));
   }
   // 为输出参数复制
   *tuple = Tuple(out_values, out_schema);

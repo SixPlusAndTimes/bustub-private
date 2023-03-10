@@ -94,9 +94,9 @@ class HashJoinExecutor : public AbstractExecutor {
   RID right_rid_;
 
   bool right_table_empty_ = false;
-
-  std::size_t probe_pos_ = 0;  // 指示在map的vector探测下标
-
-  bool vector_probe_done_ = false;  // 是否在一个vector中探测完成
+  // 指示在map的vector探测下标
+  std::size_t probe_pos_ = 0;  
+  // 是否在map的一个vector中探测完成
+  bool vector_probe_done_ = false;  
 };
 }  // namespace bustub

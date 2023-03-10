@@ -41,7 +41,7 @@ make test_name
 
 # 优化lab1
 
-执行测试程序10次，计算其平均执行时间，shell脚本(testTime.sh)在build目录下。提一嘴，我完全不懂shell编程，是让ChatGPT生成的，还真不错 :)
+shell脚本,执行测试程序10次，计算其平均执行时间，。提一嘴，我完全不懂shell编程，是让ChatGPT生成的，还真不错 :)
 
 初始：
 
@@ -60,7 +60,7 @@ make test_name
 ~~~shell
 ./testTime.sh ./TestAll
 ....
-平均运行时间为：4.478
+平均运行时间为：4.580
 ~~~
 
 # 优化lab4
