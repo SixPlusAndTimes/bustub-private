@@ -44,9 +44,6 @@ bool SeqScanExecutor::Next(Tuple *tuple, RID *rid) {
     //除了 READ_UNCOMMITER 隔离级别，其他级别都需要加读锁
     if (exec_ctx_->GetTransaction()->GetIsolationLevel() != IsolationLevel::READ_UNCOMMITTED) {
       exec_ctx_->GetLockManager()->LockShared(exec_ctx_->GetTransaction(), tableheap_iterator_->GetRid());
-      // LOG_DEBUG("lockshared txn id %d, ridpageid = %d, ridslotnum =
-      // %d",exec_ctx_->GetTransaction()->GetTransactionId(),tableheap_iterator_->GetRid().GetPageId(),
-      // tableheap_iterator_->GetRid().GetSlotNum() );
     }
     auto predicate = plan_->GetPredicate();
     // 不满足条件则继续迭代
@@ -64,8 +61,8 @@ bool SeqScanExecutor::Next(Tuple *tuple, RID *rid) {
     std::vector<Value> values;
     values.reserve(output_shema_->GetColumnCount());
     for (uint32_t i = 0; i < output_shema_->GetColumnCount(); i++) {
-      // 注意 ： 这里的Evaluate方法输入的schema参数是锁扫描表的shema，而不是outputschema，否则会访问非法内存！
       Value value = output_shema_->GetColumn(i).GetExpr()->Evaluate(&(*tableheap_iterator_), &table_info_->schema_);
+      // 这个move似乎是不起作用的，因为Value没有定义移动构造函数。
       values.push_back(std::move(value));
     }
 

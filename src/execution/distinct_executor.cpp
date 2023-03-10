@@ -47,8 +47,6 @@ void DistinctExecutor::Init() {
 bool DistinctExecutor::Next(Tuple *tuple, RID *rid) {
   if (set_itetator_ != set_.cend()) {
     // 优化点 ： 不需要临时变量, 迭代器自增操作改成前置
-    // const auto values = (*set_itetator_).values_;
-    // auto distint_outschema = plan_->OutputSchema();
     *tuple = Tuple((*set_itetator_).values_, plan_->OutputSchema());
     ++set_itetator_;
     return true;
