@@ -27,30 +27,31 @@ AggregationExecutor::AggregationExecutor(ExecutorContext *exec_ctx, const Aggreg
 void AggregationExecutor::TupleSchemaTranformUseEvaluateAggregate(const std::vector<Value> &group_bys,
                                                                   const std::vector<Value> &aggregates,
                                                                   Tuple *dest_tuple, const Schema *dest_schema) {
-  auto colums = dest_schema->GetColumns();
+  auto& colums = dest_schema->GetColumns();
   std::vector<Value> dest_value;
   // 优化点 ： reserve
   dest_value.reserve(colums.size());
   for (const auto &col : colums) {
-    dest_value.emplace_back(col.GetExpr()->EvaluateAggregate(group_bys, aggregates));
+    dest_value.push_back(col.GetExpr()->EvaluateAggregate(group_bys, aggregates));
   }
   *dest_tuple = Tuple(dest_value, dest_schema);
 }
+// 优化点：消除临时变量
 void AggregationExecutor::Init() {
   child_->Init();
-  AggregateKey key;
-  AggregateValue value;
+  // AggregateKey key;
+  // AggregateValue value;
   Tuple child_tuple;
   RID child_rid;
-  bool res;
+  // bool res;
   while (true) {
-    res = child_->Next(&child_tuple, &child_rid);
-    if (!res) {
+    // res = child_->Next(&child_tuple, &child_rid);
+    if (!child_->Next(&child_tuple, &child_rid)) {
       break;
     }
-    key = MakeAggregateKey(&child_tuple);
-    value = MakeAggregateValue(&child_tuple);
-    aht_.InsertCombine(key, value);
+    // key = MakeAggregateKey(&child_tuple);
+    // value = MakeAggregateValue(&child_tuple);
+    aht_.InsertCombine(MakeAggregateKey(&child_tuple), MakeAggregateValue(&child_tuple));
   }
   aht_iterator_ = aht_.Begin();
 }

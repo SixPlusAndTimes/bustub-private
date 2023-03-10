@@ -71,11 +71,11 @@ bool NestedLoopJoinExecutor::Next(Tuple *tuple, RID *rid) {
       std::vector<Value> values;
       // 优化点：reserve和std::move
       auto output_shema = plan_->OutputSchema();
-      // values.reserve(output_shema->GetColumnCount());
+      values.reserve(output_shema->GetColumnCount());
       for (uint32_t i = 0; i < output_shema->GetColumnCount(); i++) {
         Value value = output_shema->GetColumn(i).GetExpr()->EvaluateJoin(
             &left_tuple_, left_executor_->GetOutputSchema(), &right_tuple, right_executor_->GetOutputSchema());
-        values.push_back(value);
+        values.push_back(std::move(value));
       }
       *tuple = Tuple(values, output_shema);
       *rid = left_tuple_.GetRid();  // 左表的rid

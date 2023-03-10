@@ -37,7 +37,8 @@ void DistinctExecutor::Init() {
     for (uint32_t i = 0; i < plan_->OutputSchema()->GetColumnCount(); i++) {
       values.push_back(tuple.GetValue(schema, i));
     }
-    set_.insert({values});
+    // 优化点： std::move
+    set_.insert({std::move(values)});
 
   }
   set_itetator_ = set_.cbegin();
@@ -45,11 +46,11 @@ void DistinctExecutor::Init() {
 
 bool DistinctExecutor::Next(Tuple *tuple, RID *rid) {
   if (set_itetator_ != set_.cend()) {
-    // 优化点 ： 不需要临时变量
-    const auto values = (*set_itetator_).values_;
-    auto distint_outschema = plan_->OutputSchema();
-    *tuple = Tuple(values, distint_outschema);
-    set_itetator_++;
+    // 优化点 ： 不需要临时变量, 迭代器自增操作改成前置
+    // const auto values = (*set_itetator_).values_;
+    // auto distint_outschema = plan_->OutputSchema();
+    *tuple = Tuple((*set_itetator_).values_, plan_->OutputSchema());
+    ++set_itetator_;
     return true;
   }
   return false;

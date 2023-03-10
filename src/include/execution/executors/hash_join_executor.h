@@ -88,9 +88,10 @@ class HashJoinExecutor : public AbstractExecutor {
   std::unique_ptr<AbstractExecutor> right_executor_;
   // 使用 vector 处理元组有相同jion_key的情况
   // 而不同join_key的碰撞处理，unoreder_map已经实现了，这也是为什么要为JoinKey重载 == 操作符。
+  // map的key是连接键，map的value是一个数组，里面存放所有对应连接键的元组
   std::unordered_map<JoinKey, std::vector<Tuple>> join_map_;
 
-  Tuple right_tuple_;
+  Tuple right_tuple_; // probe阶段的状态变量，相当于右表的游标。 在init中被初始化
   RID right_rid_;
 
   bool right_table_empty_ = false;
