@@ -70,7 +70,6 @@ bool AggregationExecutor::Next(Tuple *tuple, RID *rid) {
       ++aht_iterator_;  // 指向下一位置
       return true;
     }
-
     ++aht_iterator_;  // 指向下一位置
   }
   return false;
