@@ -27,10 +27,8 @@ bool LimitExecutor::Next(Tuple *tuple, RID *rid) {
   if (tuple_count_ >= plan_->GetLimit()) {
     return false;
   }
-
-  bool res = child_executor_->Next(tuple, rid);
   tuple_count_++;
-  return res;
+  return child_executor_->Next(tuple, rid);
 }
 
 }  // namespace bustub

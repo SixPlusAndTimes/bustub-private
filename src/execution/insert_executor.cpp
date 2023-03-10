@@ -65,7 +65,6 @@ bool InsertExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) {
 
   if (get_tuple_successed) {
     // 在tableheap中执行真正的插入
-    // LOG_DEBUG("Insert in Table heap");
     insert_successed =
         table_info_->table_->InsertTuple(tuple_to_be_inserted, &rid_to_be_inserted, exec_ctx_->GetTransaction());
     if (insert_successed) {

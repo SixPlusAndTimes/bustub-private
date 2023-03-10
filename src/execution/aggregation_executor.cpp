@@ -29,6 +29,7 @@ void AggregationExecutor::TupleSchemaTranformUseEvaluateAggregate(const std::vec
                                                                   Tuple *dest_tuple, const Schema *dest_schema) {
   auto colums = dest_schema->GetColumns();
   std::vector<Value> dest_value;
+  // 优化点 ： reserve
   dest_value.reserve(colums.size());
   for (const auto &col : colums) {
     dest_value.emplace_back(col.GetExpr()->EvaluateAggregate(group_bys, aggregates));

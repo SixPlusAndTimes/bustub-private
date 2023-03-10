@@ -62,11 +62,11 @@ bool SeqScanExecutor::Next(Tuple *tuple, RID *rid) {
     // 优化点 ： reserve 和 std::move？
     // 构造ValueVector以创建Tuple
     std::vector<Value> values;
-    // values.reserve(output_shema_->GetColumnCount());
+    values.reserve(output_shema_->GetColumnCount());
     for (uint32_t i = 0; i < output_shema_->GetColumnCount(); i++) {
       // 注意 ： 这里的Evaluate方法输入的schema参数是锁扫描表的shema，而不是outputschema，否则会访问非法内存！
       Value value = output_shema_->GetColumn(i).GetExpr()->Evaluate(&(*tableheap_iterator_), &table_info_->schema_);
-      values.push_back(value);
+      values.push_back(std::move(value));
     }
 
     // 创建Tuple并传出

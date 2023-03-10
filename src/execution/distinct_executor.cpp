@@ -40,13 +40,12 @@ void DistinctExecutor::Init() {
     set_.insert({values});
 
   }
-  // int set_size = static_cast<int>(set_.size());
-  // LOG_DEBUG("set_size == %d",set_size );
   set_itetator_ = set_.cbegin();
 }
 
 bool DistinctExecutor::Next(Tuple *tuple, RID *rid) {
   if (set_itetator_ != set_.cend()) {
+    // 优化点 ： 不需要临时变量
     const auto values = (*set_itetator_).values_;
     auto distint_outschema = plan_->OutputSchema();
     *tuple = Tuple(values, distint_outschema);
