@@ -41,7 +41,7 @@ void HashJoinExecutor::Init() {
     // 右表为空
     right_table_empty_ = true;
   }
-  // 1. Build阶段在Init中完成， 即将外表(左表)的全部元组按照joinkey散列到hash_map中
+  /*1. Build阶段在Init中完成， 即将外表(左表)的全部元组按照joinkey散列到hash_map中*/ 
   Tuple left_tuple;
   RID left_rid;
   JoinKey left_join_key;
@@ -60,7 +60,7 @@ void HashJoinExecutor::Init() {
 }
 
 bool HashJoinExecutor::Next(Tuple *tuple, RID *rid) {
-  // 2. probe 阶段
+  /*2. probe 阶段 */ 
   
   // 2.1 外表或者内表为空直接返回false
   if (join_map_.empty() || right_table_empty_) {

@@ -39,18 +39,14 @@ void AggregationExecutor::TupleSchemaTranformUseEvaluateAggregate(const std::vec
 // 优化点：消除临时变量
 void AggregationExecutor::Init() {
   child_->Init();
-  // AggregateKey key;
-  // AggregateValue value;
+
   Tuple child_tuple;
   RID child_rid;
-  // bool res;
   while (true) {
-    // res = child_->Next(&child_tuple, &child_rid);
     if (!child_->Next(&child_tuple, &child_rid)) {
       break;
     }
-    // key = MakeAggregateKey(&child_tuple);
-    // value = MakeAggregateValue(&child_tuple);
+
     aht_.InsertCombine(MakeAggregateKey(&child_tuple), MakeAggregateValue(&child_tuple));
   }
   aht_iterator_ = aht_.Begin();
