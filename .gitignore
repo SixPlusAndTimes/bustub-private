@@ -74,7 +74,7 @@ build_debug/
 *.lo
 *.la
 *~
-*.pdf
+# *.pdf
 *.swp
 a.out
 
