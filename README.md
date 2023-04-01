@@ -39,6 +39,14 @@ make test_name
 - 调整代码结构，使其更精简
 - 调整算法逻辑，使其更快速
 
+# 关于lab2
+个人感觉lab2是最难的一个实验。
+
+得理解动态哈希表的概念，推荐资料如下：
+- [geeksforgeeks](https://www.geeksforgeeks.org/extendible-hashing-dynamic-approach-to-dbms/)
+- [youtube视频](https://www.youtube.com/watch?v=cmneVtDrhAA&ab_channel=ChrisMarriott-ComputerScience)
+- [我自己画的示意图](https://github.com/SixPlusAndTimes/bustub-private/blob/main/dynamic_hashing--insert%E5%92%8Cbucketsplit%E6%BC%94%E7%A4%BA.pdf)
+
 # 优化lab1
 
 shell脚本,执行测试程序10次，计算其平均执行时间，。提一嘴，我完全不懂shell编程，是让ChatGPT生成的，还真不错 :)

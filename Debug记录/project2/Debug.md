@@ -1,3 +1,8 @@
+# 理解动态hash
+推荐资料：
+- https://www.geeksforgeeks.org/extendible-hashing-dynamic-approach-to-dbms/
+- https://www.youtube.com/watch?v=cmneVtDrhAA&ab_channel=ChrisMarriott-ComputerScience
+- https://github.com/SixPlusAndTimes/bustub-private/blob/main/dynamic_hashing--insert%E5%92%8Cbucketsplit%E6%BC%94%E7%A4%BA.pdf
 # Build error
 很可能是代码风格的问题，我为了这个问题提交了不下15次;
 `make format` `make check-lint` 在本地通过后，很玄学的，gradescope竟然没通过。。。只能一点一点比对
