@@ -130,7 +130,6 @@ bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const
   table_latch_.RUnlock();
   // 一定要在 split insert之前释放 hash table的读锁，因为split insert 要写锁，不然就死锁了 ！
   if (!insert_successed && bucket_page->IsFull()) {
-    // LOG_DEBUG("Split Inserting...");
     insert_successed = SplitInsert(transaction, key, value);
   }
 
@@ -139,7 +138,6 @@ bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, const ValueType &value) {
-  // LOG_DEBUG("!!!!!!!!Recursively CallSplit Insert()!!!!!!");
   table_latch_.WLock();
   HashTableDirectoryPage *dir_page = FetchDirectoryPage();
   auto bucket_idx = KeyToDirectoryIndex(key, dir_page);
@@ -148,12 +146,9 @@ bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
 
   if (!bucket_page->IsFull()) {
     // 如果bucket_page没有满，则不用再分裂了， 相当于递归的中终止条件
-    // LOG_DEBUG("NO Need to split");
     bool ret = bucket_page->Insert(key, value, comparator_);
     buffer_pool_manager_->UnpinPage(bucket_page_id, true);
     buffer_pool_manager_->UnpinPage(directory_page_id_, true);
-    // LOG_DEBUG("afer last key inserted, bucket condition : ");
-    // bucket_page->PrintBucket();
     table_latch_.WUnlock();
     return ret;
   }
@@ -165,12 +160,8 @@ bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
   auto global_depth = dir_page->GetGlobalDepth();
   if (local_depth == global_depth) {
     // Directory Expansion
-    // LOG_DEBUG("expension directory");
     ExpensionDirectory(dir_page);
-    // LOG_DEBUG("after expension director, global depth = %d, diretory view:", dir_page->GetGlobalDepth());
-    // if (dir_page->GetGlobalDepth() <= 5) {
-    //   dir_page->PrintDirectory();
-    // }
+
   }
 
   auto split_image_idx = dir_page->GetSplitImageIndex(bucket_idx);
@@ -187,6 +178,7 @@ bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
   auto local_mask_of_original = dir_page->GetLocalDepthMask(bucket_idx);
   // assert(local_mask_of_image == local_mask_of_original);
 
+  // 下面两个循环分别调整directory的下半部分对应bucket的localdepth，下半部分的pageid要和上半部分的相同！
   // 将directory的下半部分对应的bucket的localdeoth加一，并且将所有的镜像页设置为对应的page_id
   for (uint32_t index = dir_page->Size() / 2; index < dir_page->Size(); index++) {
     if ((index & local_mask_of_image) == (split_image_idx & local_mask_of_image)) {
@@ -202,10 +194,6 @@ bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
     }
   }
 
-  // LOG_DEBUG("IncrLocalDepth... and new bucket page, directory view : ");
-  // dir_page->PrintDirectory();
-  // reinterpret_cast<Page *>(bucket_page)->WLatch();
-  // reinterpret_cast<Page *>(image_bucket_page)->WLatch();
 
   // LOG_DEBUG("=========================Now Starting Rehashing !========================");
   // rehash所有原bucket中的元素 , 这个过程一定不会overflow
@@ -213,12 +201,6 @@ bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
     auto key_rehash = bucket_page->KeyAt(i);
     auto value_rehash = bucket_page->ValueAt(i);
 
-    // for debug
-    // auto rehash_bucket_idx = KeyToDirectoryIndex(key_rehash, dir_page);
-    // if (rehash_bucket_idx < 0 || rehash_bucket_idx >= dir_page->Size()) {
-    //   std::cout << "something wrong here, rehash_bucket_idx < 0  or rehash_bucket_idx >= direcory size\n";
-    // }
-    // for debug
 
     auto rehash_bucket_page_id = KeyToPageId(key_rehash, dir_page);
 
@@ -233,17 +215,7 @@ bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
     // TODO(ljc): RemoveAt可能会更快
     bucket_page->Remove(key_rehash, value_rehash, comparator_);
   }
-  // // LOG_DEBUG("===============Rehashing Complete!=================, direcotory page:");
-  // if (dir_page->GetGlobalDepth() == 1) {
-  //   dir_page->PrintDirectory();
-  //   LOG_DEBUG("==========bucket page :  ");
-  //   bucket_page->PrintBucket();
-  //   LOG_DEBUG("==========image_bucket page :  ");
-  //   image_bucket_page->PrintBucket();
-  // }
 
-  // reinterpret_cast<Page *>(image_bucket_page)->WUnlatch();  // 注意加锁顺序
-  // reinterpret_cast<Page *>(bucket_page)->WUnlatch();
 
   buffer_pool_manager_->UnpinPage(bucket_page_id, true);
   buffer_pool_manager_->UnpinPage(split_bucket_page_id, true);
@@ -296,7 +268,6 @@ bool HASH_TABLE_TYPE::Remove(Transaction *transaction, const KeyType &key, const
   table_latch_.RUnlock();
   // 在释放读锁后再调用merge，因为merge要获取写锁。 否则会引发死锁
   if (has_deleted && bucket_page->IsEmpty()) {
-    // LOG_DEBUG("merge ! Before merge directory :");
     Merge(transaction, key, value);
     ExtraMerge(transaction, key, value);
   }
@@ -319,9 +290,6 @@ void HASH_TABLE_TYPE::Merge(Transaction *transaction, const KeyType &key, const 
   auto ld_of_empty_bucket = dir_page->GetLocalDepth(bucket_empty_index);
   auto ld_of_image_bucket = dir_page->GetLocalDepth(bucket_image_index);
 
-  // for debug
-  // LOG_DEBUG("Enter merge :");
-  // for debug
 
   HASH_TABLE_BUCKET_TYPE *empty_bucket = FetchBucketPage(bucket_empty_page_id);
   // 判断是否能够合并
@@ -330,22 +298,8 @@ void HASH_TABLE_TYPE::Merge(Transaction *transaction, const KeyType &key, const 
       empty_bucket
           ->IsEmpty()) {  // 再次判断bucket是否为空，是因为 remove 函数中是释放锁之后再 调用
                           // Merge的，可能这之间已经有其他线程插入了某个值。否则会出现某名奇妙的内存错误（本地测试）！
-    // for debug
-    // LOG_DEBUG("Merge occur , before merge :");
-    // dir_page->PrintDirectory();
-    // uint32_t dir_size = dir_page->Size();
-    // for (uint32_t idx = 0; idx < dir_size; idx++) {
-    //   auto bucket_page_id = dir_page->GetBucketPageId(idx);
-    //   HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(bucket_page_id);
-    //   LOG_DEBUG("BucketIndex = %d" , idx);
-    //   bucket_page->PrintBucket();
-    //   buffer_pool_manager_->UnpinPage(bucket_page_id, false, nullptr);
-    // }
-    // for debug
 
     // 删除空余的bucket页
-    // reinterpret_cast<Page *>(empty_bucket)->WLatch();
-    // LOG_DEBUG("delete page_id %d", bucket_empty_page_id);
     buffer_pool_manager_->UnpinPage(bucket_empty_page_id, false);
     buffer_pool_manager_->DeletePage(bucket_empty_page_id);
     // reinterpret_cast<Page *>(empty_bucket)->WUnlatch();
@@ -367,27 +321,7 @@ void HASH_TABLE_TYPE::Merge(Transaction *transaction, const KeyType &key, const 
     }
     ShrinkDirectory(dir_page);
   }
-  // else {
-  //   LOG_DEBUG("Didn't merge");
-  //   LOG_DEBUG(
-  //       "ld_of_empty_bucket = %d , ld_of_empty_bucket = %d : ld_of_image_bucket %d, bucket_empty_page_id = %d , "
-  //       "bucket_image_page_id = %d",
-  //       ld_of_empty_bucket, ld_of_empty_bucket, ld_of_image_bucket, bucket_empty_page_id, bucket_image_page_id);
-  //   LOG_DEBUG("...");
-  // }
-  // debug
-  // LOG_DEBUG("after merger directory");
-  // dir_page->PrintDirectory();
-  // uint32_t dir_size = dir_page->Size();
-  // for (uint32_t idx = 0; idx < dir_size; idx++) {
-  //   auto bucket_page_id = dir_page->GetBucketPageId(idx);
-  //   HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(bucket_page_id);
-  //   LOG_DEBUG("BucketIndex = %d" , idx);
-  //   bucket_page->PrintBucket();
-  //   buffer_pool_manager_->UnpinPage(bucket_page_id, false, nullptr);
-  // }
-  // LOG_DEBUG("...");
-  // debug
+
 
   // 别忘了unpin这个页面， 本来向写一个标志位判断来者，但是不知道为什么总是 segv ， 还是直接true
   buffer_pool_manager_->UnpinPage(bucket_empty_page_id, true);

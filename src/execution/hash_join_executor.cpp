@@ -46,7 +46,7 @@ void HashJoinExecutor::Init() {
   RID left_rid;
   JoinKey left_join_key;
   const Schema *left_schema = left_executor_->GetOutputSchema();
-  // 优化点： find 和 count的使用，std::move, 中间变量完全可以不要， map使用emplace？，hashmap的chain为什么用vector不用list？
+  // 优化点： find 和 count的使用，std::move, 中间变量完全可以不要
   while (left_executor_->Next(&left_tuple, &left_rid)) {
     left_join_key = {plan_->LeftJoinKeyExpression()->Evaluate(&left_tuple, left_schema)};
     auto iter = join_map_.find(left_join_key);
@@ -70,7 +70,6 @@ bool HashJoinExecutor::Next(Tuple *tuple, RID *rid) {
   JoinKey right_join_key;
   const Schema *right_schema = right_executor_->GetOutputSchema();
   auto iter = join_map_.end();
-  // 优化点： 中间变量完全可以不要
   // 2.1 循环找出hash表中与右表元组连接键相同的左表元组的vector。right_tuple_相当于指向右表的元组。 如果找不到与之相同连接键的左表元组，则更新right_tuple_指向下一个右表元组
   right_join_key = {plan_->RightJoinKeyExpression()->Evaluate(&right_tuple_, right_schema)};
   while ((iter = join_map_.find(right_join_key)) == join_map_.end() || vector_probe_done_) {
@@ -101,7 +100,6 @@ bool HashJoinExecutor::Next(Tuple *tuple, RID *rid) {
   // 2.3 组装连接后的tuple
   auto out_schema = plan_->OutputSchema();
   auto left_schema = left_executor_->GetOutputSchema();
-  // 优化点：使用引用
   auto& colunms = out_schema->GetColumns();
   std::vector<Value> out_values;
   // 优化点：使用reserve 
