@@ -75,6 +75,7 @@ TEST(BufferPoolManagerInstanceTest, SampleTest) {
 
   // Shutdown the disk manager and remove the temporary file we created.
   disk_manager->ShutDown();
+  // remove是C库函数，从磁盘上移除了名为test.db的文件
   remove("test.db");
 
   delete bpm;

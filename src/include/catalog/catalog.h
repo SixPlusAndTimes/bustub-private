@@ -93,7 +93,7 @@ struct IndexInfo {
 };
 
 /**
- * Cataloc 记录整个数据库中的table和index信息
+ * Cataloc 记录整个数据库中的table和index信息, 注意它是“non-persistent”的！
  * The Catalog is a non-persistent catalog that is designed for
  * use by executors within the DBMS execution engine. It handles
  * table creation, table lookup, index creation, and index lookup.

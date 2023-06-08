@@ -89,7 +89,8 @@ void TableGenerator::FillTable(TableInfo *info, TableInsertMeta *table_meta) {
     }
   }
 }
-
+// 生成插入信息，insert_meta
+// 生成有column组成的schema
 void TableGenerator::GenerateTestTables() {
   /**
    * This array configures each of the test tables. Each table is configured
@@ -179,6 +180,7 @@ void TableGenerator::GenerateTestTables() {
         cols.emplace_back(col_meta.name_, col_meta.type_, TEST_VARLEN_SIZE);
       }
     }
+    // 有colms组成schema
     Schema schema(cols);
     auto info = exec_ctx_->GetCatalog()->CreateTable(exec_ctx_->GetTransaction(), table_meta.name_, schema);
     FillTable(info, &table_meta);

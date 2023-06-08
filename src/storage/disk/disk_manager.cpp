@@ -30,6 +30,7 @@ static char *buffer_used;
  * Constructor: open/create a single database file & log file
  * @input db_file: database file name
  */
+ // 一个OS文件对应一个database文件，文件中可包含多个数据库概念上的表， 每个表由page串联成一个双向链表
 DiskManager::DiskManager(const std::string &db_file)
     : file_name_(db_file), num_flushes_(0), num_writes_(0), flush_log_(false), flush_log_f_(nullptr) {
   std::string::size_type n = file_name_.rfind('.');

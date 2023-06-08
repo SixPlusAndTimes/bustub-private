@@ -46,7 +46,7 @@ class ExecutorTest : public ::testing::Test {
 
     // Initialize the database subsystems
     lock_manager_ = std::make_unique<LockManager>();
-    disk_manager_ = std::make_unique<DiskManager>("executor_test.db");
+    disk_manager_ = std::make_unique<DiskManager>("executor_test.db"); // disk_manager于是就打开了名为“executor_test.db”的文件
     bpm_ = std::make_unique<BufferPoolManagerInstance>(32, disk_manager_.get());
     txn_mgr_ = std::make_unique<TransactionManager>(lock_manager_.get(), log_manager_.get());
     catalog_ = std::make_unique<Catalog>(bpm_.get(), lock_manager_.get(), log_manager_.get());

@@ -166,6 +166,7 @@ class TablePage : public Page {
   /** Set the number of tuples in this page. */
   void SetTupleCount(uint32_t tuple_count) { memcpy(GetData() + OFFSET_TUPLE_COUNT, &tuple_count, sizeof(uint32_t)); }
 
+  // 空闲指针 - PageHeader的大小 - 每个tuple的记录信息大小 * tuple的个数
   uint32_t GetFreeSpaceRemaining() {
     return GetFreeSpacePointer() - SIZE_TABLE_PAGE_HEADER - SIZE_TUPLE * GetTupleCount();
   }

@@ -127,6 +127,7 @@ bool TablePage::MarkDelete(const RID &rid, Transaction *txn, LockManager *lock_m
   return true;
 }
 
+// 如果新tuple占用的空间大于旧tuple的大小，那么次方法返回false。应该要求上层调用者，先调用delete然后再调用insert完成update操作。
 bool TablePage::UpdateTuple(const Tuple &new_tuple, Tuple *old_tuple, const RID &rid, Transaction *txn,
                             LockManager *lock_manager, LogManager *log_manager) {
   BUSTUB_ASSERT(new_tuple.size_ > 0, "Cannot have empty tuples.");
@@ -228,7 +229,7 @@ void TablePage::ApplyDelete(const RID &rid, Transaction *txn, LogManager *log_ma
 
   uint32_t free_space_pointer = GetFreeSpacePointer();
   BUSTUB_ASSERT(tuple_offset >= free_space_pointer, "Free space appears before tuples.");
-
+  // 把tuple_offset - free_space_pointer这一整段往前挪tuple_size距离，相当于一个 compact操作
   memmove(GetData() + free_space_pointer + tuple_size, GetData() + free_space_pointer,
           tuple_offset - free_space_pointer);
   SetFreeSpacePointer(free_space_pointer + tuple_size);
