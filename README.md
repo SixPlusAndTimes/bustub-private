@@ -3,6 +3,8 @@
 # 整个实验的大致架构图
 其中蓝色方块是学生补充完成的部分。
 
+![img](/Pics/CMU15-445整体架构图.png)
+
 # gradescope通过截图
 Project1 :
 ![img](/Pics/CMU15-445P1_PASS_PIC.png)
