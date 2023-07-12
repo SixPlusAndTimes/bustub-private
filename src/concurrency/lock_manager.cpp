@@ -61,7 +61,6 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
     //   1. unordered_map由key，value组成，无法区分emplce()参数中，那些用来构造key，那些用来构造alue，因此可以使用makepair或者forward_as_tuple做区分
     //   2. 但是这里的unordered_map的alue中有一个LockRequestQueue内含条件变量，它不能被拷贝也不能被移动，必须在原地构造出来，因此传入了piecewise_construct参数
     //   3. 下面的创建语法就是说rid作为key， 而value则是原地构建出来的。 
-    // 详见https://www.cnblogs.com/guxuanqing/p/11396511.html
     lock_table_.emplace(std::piecewise_construct, std::forward_as_tuple(rid), std::forward_as_tuple());
     // 在新创建的requestqueue添加新的 request
     new_request.granted_ = true;

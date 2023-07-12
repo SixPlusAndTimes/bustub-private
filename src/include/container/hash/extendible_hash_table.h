@@ -172,7 +172,7 @@ class ExtendibleHashTable {
 
   //自定义函数
   void ExpensionDirectory(HashTableDirectoryPage *dir_page);
-  void ShrinkDirectory(HashTableDirectoryPage *dir_page);
+  bool ShrinkDirectory(HashTableDirectoryPage *dir_page);
   bool ExtraMerge(Transaction *transaction, const KeyType &key, const ValueType &value);
   HashTableDirectoryPage *CreateDirectoryPage(page_id_t *bucket_page_id);
   HASH_TABLE_BUCKET_TYPE *CreateBucketPage(page_id_t *bucket_page_id);

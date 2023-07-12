@@ -148,7 +148,7 @@ bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
     // 如果bucket_page没有满，则不用再分裂了， 相当于递归的中终止条件
     bool ret = bucket_page->Insert(key, value, comparator_);
     buffer_pool_manager_->UnpinPage(bucket_page_id, true);
-    buffer_pool_manager_->UnpinPage(directory_page_id_, true);
+    buffer_pool_manager_->UnpinPage(directory_page_id_, false); // 注意这里false
     table_latch_.WUnlock();
     return ret;
   }
@@ -158,8 +158,10 @@ bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
   //  如果local-depth < global_depth, 那么仅分裂bucket即可
   auto local_depth = dir_page->GetLocalDepth(bucket_idx);
   auto global_depth = dir_page->GetGlobalDepth();
+  bool derctory_spted = false;
   if (local_depth == global_depth) {
     // Directory Expansion
+    derctory_spted = true;
     ExpensionDirectory(dir_page);
 
   }
@@ -197,6 +199,7 @@ bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
 
   // LOG_DEBUG("=========================Now Starting Rehashing !========================");
   // rehash所有原bucket中的元素 , 这个过程一定不会overflow
+  bool to_new = false; // 如果rehash过程中涉及到了 要不要刷页
   for (uint32_t i = 0; i < static_cast<uint32_t>(BUCKET_ARRAY_SIZE); i++) {
     auto key_rehash = bucket_page->KeyAt(i);
     auto value_rehash = bucket_page->ValueAt(i);
@@ -211,17 +214,18 @@ bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
     }
     // 如果被hash到镜像bucket中，那么将它加入新的bucket，并且从老的bucket中删除
     // assert(rehash_bucket_page_id != split_bucket_page_id);  // 此时一定在镜像bucket中
+    to_new = true;
     image_bucket_page->Insert(key_rehash, value_rehash, comparator_);
     // TODO(ljc): RemoveAt可能会更快
     bucket_page->Remove(key_rehash, value_rehash, comparator_);
   }
 
 
-  buffer_pool_manager_->UnpinPage(bucket_page_id, true);
-  buffer_pool_manager_->UnpinPage(split_bucket_page_id, true);
+  buffer_pool_manager_->UnpinPage(bucket_page_id, to_new);
+  buffer_pool_manager_->UnpinPage(split_bucket_page_id, to_new);
 
   // 不要忘记unpin页面,这里有3个！
-  buffer_pool_manager_->UnpinPage(directory_page_id_, true);
+  buffer_pool_manager_->UnpinPage(directory_page_id_, derctory_spted);
 
   table_latch_.WUnlock();
 
@@ -293,6 +297,7 @@ void HASH_TABLE_TYPE::Merge(Transaction *transaction, const KeyType &key, const 
 
   HASH_TABLE_BUCKET_TYPE *empty_bucket = FetchBucketPage(bucket_empty_page_id);
   // 判断是否能够合并
+  bool merged = false;
   if (ld_of_empty_bucket > 0 && ld_of_empty_bucket == ld_of_image_bucket &&
       bucket_empty_page_id != bucket_image_page_id &&
       empty_bucket
@@ -302,6 +307,7 @@ void HASH_TABLE_TYPE::Merge(Transaction *transaction, const KeyType &key, const 
     // 删除空余的bucket页
     buffer_pool_manager_->UnpinPage(bucket_empty_page_id, false);
     buffer_pool_manager_->DeletePage(bucket_empty_page_id);
+    merged = true;
     // reinterpret_cast<Page *>(empty_bucket)->WUnlatch();
 
     auto local_mask = dir_page->GetLocalDepthMask(bucket_empty_index);
@@ -324,23 +330,26 @@ void HASH_TABLE_TYPE::Merge(Transaction *transaction, const KeyType &key, const 
 
 
   // 别忘了unpin这个页面， 本来向写一个标志位判断来者，但是不知道为什么总是 segv ， 还是直接true
-  buffer_pool_manager_->UnpinPage(bucket_empty_page_id, true);
+  if (!merged) {
+    buffer_pool_manager_->UnpinPage(bucket_empty_page_id, false);
+  }
 
-  buffer_pool_manager_->UnpinPage(directory_page_id_, true);
+  buffer_pool_manager_->UnpinPage(directory_page_id_, merged);
   table_latch_.WUnlock();
 }
 
 // 自定义函数
 template <typename KeyType, typename ValueType, typename KeyComparator>
-void HASH_TABLE_TYPE::ShrinkDirectory(HashTableDirectoryPage *dir_page) {
+bool HASH_TABLE_TYPE::ShrinkDirectory(HashTableDirectoryPage *dir_page) {
   // 如果局部深度都小于全局深度 ， 则全局深度减1
   auto global_depth = dir_page->GetGlobalDepth();
   for (uint32_t i = 0; i < dir_page->Size(); i++) {
     if (dir_page->GetLocalDepth(i) == global_depth) {
-      return;
+      return false;
     }
   }
   dir_page->DecrGlobalDepth();
+  return true;
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
