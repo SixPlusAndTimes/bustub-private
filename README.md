@@ -69,6 +69,34 @@ shell脚本,执行测试程序10次，计算其平均执行时间，。提一嘴
               
 感觉没啥优化的样子
 
+# 优化lab2
+刚写完时，leadboard排名比较靠后，但是经过长时间debug过后，当时再也不想去碰这个实验了。
+
+现在回过头来进行优化。刚好有两次面试问到我关于项目优化的问题，所以就专门准备给lab2优化下。
+
+优化方法也更科学了一些，使用perf + 火焰图的方式寻找性能瓶颈，然后再做针对性的优化措施。
+
+参考博客： [perf对多线程Profile简单流程_perf ](https://blog.csdn.net/banfushen007/article/details/122913803)
+
+~~~c
+sudo perf record -g -F 99 <要检测的程序名>   // -p 后跟进程id
+perf script | FlameGraph/stackcollapse-perf.pl |  FlameGraph/flamegraph.pl > output.svg  // 输出的svg文件就是火焰图
+~~~
+打开图片：
+![img](/Pics/FlameFigure.png)
+可以看到主要有两个操作占用CPU的运行时间：
+- IO写操作
+- 对锁的一些操作
+其中IO的耗时比锁更多一些，因此主要对io进行优化？
+
+主要优化思路是，**减少IO操作**， 具体做法是： 在对buffer pool 的页进行unpin时，又一个bool类型变量，表示这个page是否为脏，如果为脏，则buffer pool后续必须将页写入磁盘，这是非常慢的，如果不为脏，buffer pool不会刷盘，减少了IO操作。
+
+因此，我们需要识别那些操作是无论如何都要将page设置为脏，而哪些操作根本不需要设置为脏，尽量减少IO操作。比如，SplitInsert方法中，如果仅仅split桶而没有对目录页进行增长，那么目录页可以不被设置为脏。
+*
+除了IO优化，也可以进行一些锁的优化，这主要是对**锁粒度的细化**，比较简单而且效果也不是很明显。
+
+优化效果： grading_hash_table_scale_test 的执行时间从原来的33s，减少为28s左右，优化了大约 **21%** 左右
+
 # 优化lab3
 这次就一次性测试取全部的测试代码吧, 运行15次取平均值
 ~~~shell
